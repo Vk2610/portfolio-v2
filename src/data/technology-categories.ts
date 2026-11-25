@@ -4,31 +4,35 @@ const groups = [
   {
     id: 'frontend',
     label: 'Frontend',
-    ids: [
-      'react',
-      'javascript',
-      'typescript',
-      'html5',
-      'css3',
-      'tailwindcss',
-      'bootstrap',
-      'nextdotjs',
-    ],
+    ids: ['react', 'html5', 'css3', 'tailwindcss', 'bootstrap', 'nextdotjs'],
   },
   {
-    id: 'backend-data',
-    label: 'Backend & Data',
-    ids: ['nodedotjs', 'express', 'python', 'pandas', 'firebase'],
+    id: 'backend',
+    label: 'Backend',
+    ids: ['nodedotjs', 'express', 'firebase'],
   },
   {
-    id: 'databases',
-    label: 'Databases',
+    id: 'database',
+    label: 'Database',
     ids: ['mongodb', 'mysql', 'postgresql'],
   },
   {
-    id: 'tools-platforms',
-    label: 'Tools & Platforms',
-    ids: ['git', 'github', 'visualstudiocode', 'postman', 'figma', 'vercel'],
+    id: 'languages',
+    label: 'Languages',
+    ids: ['javascript', 'typescript', 'python', 'sql'],
+  },
+  {
+    id: 'tools',
+    label: 'Tools & Others',
+    ids: [
+      'git',
+      'github',
+      'visualstudiocode',
+      'postman',
+      'figma',
+      'vercel',
+      'pandas',
+    ],
   },
 ] as const satisfies readonly {
   id: string

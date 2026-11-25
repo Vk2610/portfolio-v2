@@ -105,6 +105,13 @@ export const technologies = [
     'Programming language used for automation and data analysis.',
   ),
   technology(
+    'sql',
+    'SQL',
+    'supporting',
+    'databases',
+    'Structured Query Language for querying and managing relational databases.',
+  ),
+  technology(
     'html5',
     'HTML5',
     'supporting',

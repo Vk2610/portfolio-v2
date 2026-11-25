@@ -65,7 +65,8 @@
     transition: none;
   }
 
-  &:focus-visible > [data-underline-label]::after {
+  &:focus-visible > [data-underline-label]::after,
+  &[role='tab'][aria-selected='true'] > [data-underline-label]::after {
     transform: scaleX(1);
     transform-origin: left;
   }

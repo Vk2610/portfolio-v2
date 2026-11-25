@@ -5,7 +5,7 @@ export const profile = {
     'Building modern web applications and solving real-world problems.',
   github: 'https://github.com/Vk2610',
   linkedin: 'https://www.linkedin.com/in/vedant-kumbhar-084383221/',
-  location: 'Satara, Maharashtra',
+  location: 'Maharashtra, India',
   specialization: 'Full Stack Development',
   focus: 'Modern Web Applications',
   about: [

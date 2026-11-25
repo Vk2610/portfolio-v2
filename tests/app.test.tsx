@@ -9,10 +9,23 @@ import {
   within,
 } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { useReducedMotion } from 'motion/react'
 import App from '../src/App'
+import { profile } from '../src/data/profile'
+import { technologyCategories } from '../src/data/technology-categories'
 import { technologies } from '../src/data/technologies'
 
+vi.mock('motion/react', { spy: true })
+
 beforeEach(() => {
+  // JSDOM does not load the Tailwind stylesheet through the app entry point.
+  document.documentElement.style.setProperty('--duration-fast', '150ms')
+  document.documentElement.style.setProperty('--duration-moderate', '400ms')
+  document.documentElement.style.setProperty('--stagger', '80ms')
+  document.documentElement.style.setProperty(
+    '--ease-entrance',
+    'cubic-bezier(0.22, 1, 0.36, 1)',
+  )
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null)
   vi.stubGlobal(
     'fetch',
@@ -28,12 +41,14 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup()
+  document.documentElement.removeAttribute('style')
   vi.restoreAllMocks()
+  vi.mocked(useReducedMotion).mockReset()
   vi.unstubAllGlobals()
 })
 
 describe('application shell', () => {
-  it('links to four stack categories with every original SVG and catalog description', async () => {
+  it('links to five stack categories with every original SVG and catalog description', async () => {
     render(<App />)
     const stack = screen.getByRole('region', { name: 'My toolkit.' })
     expect(stack.id).toBe('stack')
@@ -45,44 +60,125 @@ describe('application shell', () => {
         ),
       ).toHaveAttribute('href', '#stack')
     }
-    const lists = within(stack).getAllByRole('list')
-    expect(
-      lists.map((list) => within(list).getAllByRole('button').length),
-    ).toEqual([8, 5, 3, 6])
-    expect(lists[0]).toHaveAccessibleName('Frontend')
-    expect(lists[1]).toHaveAccessibleName('Backend & Data')
-    expect(lists[2]).toHaveAccessibleName('Databases')
-    expect(lists[3]).toHaveAccessibleName('Tools & Platforms')
+    const tabs = within(stack).getAllByRole('tab')
+    expect(tabs.map((tab) => tab.textContent)).toEqual([
+      'Frontend',
+      'Backend',
+      'Database',
+      'Languages',
+      'Tools & Others',
+    ])
+    expect(within(stack).getByRole('tab', { selected: true })).toBe(tabs[0])
     expect(
       within(stack).getByText(
-        `${technologies.length} TECHNOLOGIES / 04 CATEGORIES`,
+        `${technologies.length} TECHNOLOGIES / 05 CATEGORIES`,
       ),
     ).toBeInTheDocument()
-    expect(within(stack).getAllByRole('button')).toHaveLength(22)
+    for (const [index, category] of technologyCategories.entries()) {
+      const tab = tabs[index]
+      if (index !== 0) fireEvent.click(tab)
+      expect(within(stack).getByRole('tab', { selected: true })).toBe(tab)
+      expect(tab).toHaveClass(
+        'underline-reveal',
+        'aria-selected:text-foreground',
+      )
+      expect(tab.querySelector('[data-underline-label]')).toHaveTextContent(
+        category.label,
+      )
+      const panel = within(stack).getByRole('tabpanel', {
+        name: category.label,
+      })
+      const expectedCount = [6, 3, 3, 4, 7][index]
+      expect(
+        within(panel).getByText(`${expectedCount} TECHNOLOGIES`),
+      ).toBeInTheDocument()
+      const list = await within(panel).findByRole('list', {
+        name: category.label,
+      })
+      expect(within(list).getAllByRole('button')).toHaveLength(expectedCount)
+      await waitFor(
+        () => {
+          expect(list.querySelectorAll('button svg path')).toHaveLength(
+            expectedCount,
+          )
+          for (const tile of within(list).getAllByRole('listitem')) {
+            expect(Number(getComputedStyle(tile).opacity || 1)).toBe(1)
+            expect(tile).toBeVisible()
+          }
+        },
+        { timeout: 2000 },
+      )
+      for (const technology of category.technologies) {
+        const button = within(list).getByRole('button', {
+          name: technology.label,
+        })
+        expect(button).toHaveAccessibleDescription(technology.description)
+        if (technology.id === 'sql') {
+          const sqlIcon = button.querySelector('svg[data-sql-database-search]')
+          expect(sqlIcon).toBeInTheDocument()
+          expect(sqlIcon?.querySelector('path')).toBeInTheDocument()
+          expect(sqlIcon).toHaveClass('size-9', 'fill-none', 'stroke-current')
+          continue
+        }
+        const original = new DOMParser().parseFromString(
+          readFileSync(resolve('public', technology.iconPath), 'utf8'),
+          'image/svg+xml',
+        ).documentElement
+        const svg = button.querySelector('svg')!
+        expect(svg.namespaceURI).toBe('http://www.w3.org/2000/svg')
+        expect(svg).toHaveAttribute('viewBox', original.getAttribute('viewBox'))
+        expect(svg).toHaveAttribute('width', '36')
+        expect(svg).toHaveAttribute('height', '36')
+        expect(svg.childNodes).toHaveLength(original.childNodes.length)
+        Array.from(svg.childNodes).forEach((node, index) => {
+          expect(node.isEqualNode(original.childNodes[index])).toBe(true)
+        })
+        // The current sources have no internal IDs, so Hero and tile clones can coexist.
+        expect(svg.matches('[id]') || svg.querySelector('[id]')).toBeFalsy()
+      }
+    }
+  })
 
-    await waitFor(() => {
-      expect(stack.querySelectorAll('button svg path')).toHaveLength(22)
+  it('settles on the latest category after rapid keyboard and pointer selection', async () => {
+    render(<App />)
+    const tablist = screen.getByRole('tablist', {
+      name: 'Technology categories',
     })
-    for (const technology of technologies) {
-      const button = within(stack).getByRole('button', {
-        name: technology.label,
-      })
-      expect(button).toHaveAccessibleDescription(technology.description)
-      const original = new DOMParser().parseFromString(
-        readFileSync(resolve('public', technology.iconPath), 'utf8'),
-        'image/svg+xml',
-      ).documentElement
-      const svg = button.querySelector('svg')!
-      expect(svg.namespaceURI).toBe('http://www.w3.org/2000/svg')
-      expect(svg).toHaveAttribute('viewBox', original.getAttribute('viewBox'))
-      expect(svg).toHaveAttribute('width', '32')
-      expect(svg).toHaveAttribute('height', '32')
-      expect(svg.childNodes).toHaveLength(original.childNodes.length)
-      Array.from(svg.childNodes).forEach((node, index) => {
-        expect(node.isEqualNode(original.childNodes[index])).toBe(true)
-      })
-      // The current sources have no internal IDs, so Hero and tile clones can coexist.
-      expect(svg.matches('[id]') || svg.querySelector('[id]')).toBeFalsy()
+    const [frontend, backend, database, languages, tools] =
+      within(tablist).getAllByRole('tab')
+    frontend.focus()
+    fireEvent.keyDown(frontend, { key: 'ArrowRight' })
+    expect(backend).toHaveFocus()
+    fireEvent.click(languages)
+    fireEvent.click(database)
+    fireEvent.click(tools)
+    expect(tools).toHaveAttribute('aria-selected', 'true')
+    const list = await screen.findByRole('list', { name: 'Tools & Others' })
+    expect(within(list).getAllByRole('button')).toHaveLength(7)
+    expect(
+      within(list).getByRole('button', { name: 'Git' }),
+    ).toBeInTheDocument()
+    expect(
+      within(screen.getByRole('tabpanel')).queryByRole('button', {
+        name: 'MySQL',
+      }),
+    ).toBeNull()
+  })
+
+  it('shows the newly selected grid immediately with reduced motion', () => {
+    vi.mocked(useReducedMotion).mockReturnValue(true)
+    render(<App />)
+    for (const category of technologyCategories) {
+      fireEvent.click(screen.getByRole('tab', { name: category.label }))
+      const panel = screen.getByRole('tabpanel', { name: category.label })
+      const list = within(panel).getByRole('list', { name: category.label })
+      expect(within(list).getAllByRole('button')).toHaveLength(
+        category.technologies.length,
+      )
+      for (const tile of within(list).getAllByRole('listitem')) {
+        expect(Number(getComputedStyle(tile).opacity || 1)).toBe(1)
+        expect(tile).toBeVisible()
+      }
     }
   })
 
@@ -126,7 +222,7 @@ describe('application shell', () => {
     )
     expect(
       screen.getByRole('region', { name: 'Professional status' }),
-    ).toHaveTextContent('Satara, Maharashtra')
+    ).toHaveTextContent(profile.location)
     expect(screen.getByText('02 / ABOUT ME')).toHaveClass(
       'type-mono',
       'text-muted',

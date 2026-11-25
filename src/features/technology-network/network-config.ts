@@ -52,14 +52,17 @@ const placements = {
   visualstudiocode: [0.338, 0.725, 0.56],
   postman: [0.994, 0.468, 0.48],
   figma: [0.041, 0.251, 0.4],
-} as const satisfies Record<TechnologyId, readonly [number, number, number]>
+} as const satisfies Record<
+  Exclude<TechnologyId, 'sql'>,
+  readonly [number, number, number]
+>
 
-export const technologyNodes: readonly TechnologyNode[] = technologies.map(
-  (technology) => {
+export const technologyNodes: readonly TechnologyNode[] = technologies
+  .filter((technology) => technology.id !== 'sql')
+  .map((technology) => {
     const [x, y, depth] = placements[technology.id]
     return { ...technology, base: { x, y }, depth }
-  },
-)
+  })
 
 const connections = [
   ['react', 'javascript'],
