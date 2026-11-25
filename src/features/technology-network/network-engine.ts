@@ -1,7 +1,16 @@
-import { networkConnections, technologyNodes } from './network-config'
+import {
+  networkConnections,
+  networkVisual,
+  technologyNodes,
+} from './network-config'
 import type { Point, ProjectedNode, TechnologyNode } from './network.types'
 
-const tierRadii = { primary: 24, core: 15, supporting: 10 }
+const nodeDiameter = {
+  primary: [68.4, 79.2],
+  core: [48, 56],
+  supporting: [36, 42],
+} as const
+const iconMinimum = { primary: 40, core: 26, supporting: 20 } as const
 const imageCache = new Map<string, Promise<HTMLImageElement | null>>()
 
 function loadIcon(url: string) {
@@ -26,15 +35,35 @@ export function loadNetworkIcons() {
 }
 
 export function layoutNetwork(width: number, height: number): ProjectedNode[] {
-  const scale = Math.min(1.08, Math.min(width, height) / 465)
-  const padding = 36 * scale
-  const availableWidth = Math.max(0, width - 2 * padding)
-  const availableHeight = Math.max(0, height - 2 * padding)
+  const sizeScale = Math.min(1, Math.min(width / 420, height / 360))
+  const desktop = width >= 768
+  const clearance = desktop
+    ? networkVisual.boundaryClearance.desktop
+    : networkVisual.boundaryClearance.mobile
+  const largestRadius = 44 * sizeScale
+  const maxFloat = largestRadius * 0.135
+  const cursorClearance = desktop ? largestRadius * 0.14 : 0
+  const paddingX = clearance + largestRadius + maxFloat + cursorClearance
+  const paddingY = clearance + largestRadius + maxFloat
+  const availableWidth = Math.max(0, width - 2 * paddingX)
+  const availableHeight = Math.max(0, height - 2 * paddingY)
 
   return technologyNodes.map((technology) => {
     const base = {
-      x: padding + technology.base.x * availableWidth,
-      y: padding + technology.base.y * availableHeight,
+      x:
+        paddingX +
+        (0.5 +
+          (technology.base.x - 0.5) *
+            networkVisual.networkSpread *
+            networkVisual.horizontalExpansion) *
+          availableWidth,
+      y:
+        paddingY +
+        (0.5 +
+          (technology.base.y - 0.5) *
+            networkVisual.networkSpread *
+            networkVisual.verticalExpansion) *
+          availableHeight,
     }
     return {
       technology,
@@ -43,8 +72,17 @@ export function layoutNetwork(width: number, height: number): ProjectedNode[] {
       dragOffset: { x: 0, y: 0 },
       projected: { ...base },
       radius:
-        tierRadii[technology.tier] * scale * (0.88 + 0.18 * technology.depth),
-      opacity: 0.68 + 0.32 * technology.depth,
+        (sizeScale *
+          (nodeDiameter[technology.tier][0] +
+            (nodeDiameter[technology.tier][1] -
+              nodeDiameter[technology.tier][0]) *
+              technology.depth)) /
+        2,
+      opacity:
+        networkVisual.depthOpacity.background +
+        (networkVisual.depthOpacity.foreground -
+          networkVisual.depthOpacity.background) *
+          technology.depth,
     }
   })
 }
@@ -56,8 +94,13 @@ export function projectNode(
   staticFrame: boolean,
 ) {
   const phase = index * 2.39996
-  const speed = 0.48 + node.technology.depth * 0.23
-  const amplitude = node.radius * (0.095 + node.technology.depth * 0.04)
+  const speed =
+    ((0.42 + node.technology.depth * 0.34) * networkVisual.depthIntensity) /
+    0.675
+  const amplitude =
+    node.radius *
+    (0.08 +
+      (node.technology.depth * 0.055 * networkVisual.depthIntensity) / 0.675)
 
   node.ambient.x = staticFrame
     ? 0
@@ -155,7 +198,7 @@ export function createNetworkEngine(canvas: HTMLCanvasElement) {
 
     context.lineWidth = 1
     context.strokeStyle = border
-    context.globalAlpha = 0.56
+    context.globalAlpha = networkVisual.connectionVisibility
     context.beginPath()
     for (const edge of edges) {
       const a = nodes[edge.from].projected
@@ -178,7 +221,10 @@ export function createNetworkEngine(canvas: HTMLCanvasElement) {
       }
     }
 
-    for (let i = 0; i < nodes.length; i++) {
+    const drawOrder = nodes
+      .map((_, index) => index)
+      .sort((a, b) => nodes[a].technology.depth - nodes[b].technology.depth)
+    for (const i of drawOrder) {
       const {
         projected: { x, y },
         radius,
@@ -188,13 +234,24 @@ export function createNetworkEngine(canvas: HTMLCanvasElement) {
       context.fillStyle = surface
       dot(x, y, radius)
       context.fill()
-      context.globalAlpha = opacity * 0.82
+      context.globalAlpha =
+        opacity *
+        (0.55 +
+          (0.45 * nodes[i].technology.depth * networkVisual.depthIntensity) /
+            0.675)
       context.stroke()
 
       context.globalAlpha = opacity
       const icon = icons[i]
       if (icon) {
-        const size = radius * 1.21
+        const size = Math.min(
+          radius * 1.15,
+          Math.max(
+            iconMinimum[nodes[i].technology.tier] *
+              (width < 420 ? width / 420 : 1),
+            radius * 0.84,
+          ),
+        )
         context.drawImage(icon, x - size / 2, y - size / 2, size, size)
       } else {
         context.fillStyle = foreground

@@ -14,7 +14,7 @@ export function Hero({ network }: { network?: ReactNode }) {
 
   return (
     <Section aria-labelledby="hero-title">
-      <div className="grid items-center gap-8 desktop:grid-cols-2 desktop:gap-12">
+      <div className="grid items-center gap-8 tablet:grid-cols-[0.9fr_1.1fr] tablet:gap-8 desktop:grid-cols-[0.4fr_0.6fr] desktop:gap-7">
         <div className="min-w-0">
           <p className="type-mono mb-4 text-secondary">01 / INTRO</p>
           <h1 id="hero-title" className="type-hero">

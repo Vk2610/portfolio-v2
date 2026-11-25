@@ -3,6 +3,7 @@ import { resolve } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import {
   networkConnections,
+  networkVisual,
   technologyNodes,
 } from '../src/features/technology-network/network-config'
 import {
@@ -120,6 +121,8 @@ describe('technology network configuration', () => {
   })
 
   it('forms a single connected graph without self links or repeated connections', () => {
+    expect(networkConnections.length).toBeGreaterThanOrEqual(34)
+    expect(networkConnections.length).toBeLessThanOrEqual(36)
     const ids = new Set(technologyNodes.map(({ id }) => id))
     const pairs = new Set<string>()
     for (const { from, to, packet } of networkConnections) {
@@ -146,6 +149,13 @@ describe('technology network configuration', () => {
     }
     expect(reachable).toEqual(ids)
   })
+
+  it('uses approved depth, spread and visibility settings', () => {
+    expect(networkVisual.depthIntensity).toBe(0.675)
+    expect(networkVisual.networkSpread).toBe(0.925)
+    expect(networkVisual.horizontalExpansion).toBeCloseTo(1.275)
+    expect(networkVisual.connectionVisibility).toBe(0.675)
+  })
 })
 
 describe('technology network geometry', () => {
@@ -165,6 +175,19 @@ describe('technology network geometry', () => {
           radius * (1 + Math.SQRT2 * (0.095 + technology.depth * 0.04)) + 0.5,
       )
       expect(nodes).toHaveLength(22)
+      for (const node of nodes) {
+        const diameter = node.radius * 2
+        const range =
+          node.technology.tier === 'primary'
+            ? [76, 88]
+            : node.technology.tier === 'core'
+              ? [48, 56]
+              : [36, 42]
+        expect(diameter).toBeGreaterThanOrEqual(
+          range[0] * Math.min(1, Math.min(width / 420, height / 360)),
+        )
+        expect(diameter).toBeLessThanOrEqual(range[1])
+      }
       for (let i = 0; i < nodes.length; i++) {
         const { x, y } = nodes[i].base
         const r = envelopes[i]
