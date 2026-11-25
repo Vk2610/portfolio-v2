@@ -94,38 +94,48 @@ export function TechnologyStack() {
           <div
             role="tablist"
             aria-label="Technology categories"
-            className="grid grid-cols-5"
+            className="grid grid-cols-6 gap-x-2 gap-y-1 tablet:grid-cols-5 tablet:gap-0"
           >
-            {technologyCategories.map((category, index) => (
-              <button
-                key={category.id}
-                type="button"
-                role="tab"
-                id={`technology-tab-${category.id}`}
-                aria-controls="technology-category-panel"
-                aria-selected={category.id === selected.id}
-                tabIndex={category.id === selected.id ? 0 : -1}
-                className="underline-reveal inline-flex min-h-(--target-size) min-w-0 cursor-pointer items-center justify-center whitespace-nowrap px-0 text-xs font-medium text-secondary hover:text-foreground focus-visible:text-foreground aria-selected:text-foreground tablet:text-base"
-                onClick={() => setSelectedId(category.id)}
-                onKeyDown={(event) => {
-                  const last = technologyCategories.length - 1
-                  const destinations: Partial<Record<string, number>> = {
-                    ArrowLeft: index === 0 ? last : index - 1,
-                    ArrowRight: index === last ? 0 : index + 1,
-                    Home: 0,
-                    End: last,
-                  }
-                  const nextIndex = destinations[event.key]
-                  if (nextIndex === undefined) return
-                  event.preventDefault()
-                  const next = technologyCategories[nextIndex]
-                  setSelectedId(next.id)
-                  document.getElementById(`technology-tab-${next.id}`)?.focus()
-                }}
-              >
-                <span data-underline-label>{category.label}</span>
-              </button>
-            ))}
+            {technologyCategories.map((category, index) => {
+              const mobilePlacement =
+                index === 3
+                  ? 'col-span-2 col-start-2 tablet:col-span-1 tablet:col-start-auto'
+                  : index === 4
+                    ? 'col-span-2 col-start-4 tablet:col-span-1 tablet:col-start-auto'
+                    : 'col-span-2 tablet:col-span-1'
+              return (
+                <button
+                  key={category.id}
+                  type="button"
+                  role="tab"
+                  id={`technology-tab-${category.id}`}
+                  aria-controls="technology-category-panel"
+                  aria-selected={category.id === selected.id}
+                  tabIndex={category.id === selected.id ? 0 : -1}
+                  className={`underline-reveal inline-flex min-h-(--target-size) min-w-0 cursor-pointer items-center justify-center whitespace-nowrap px-1 text-xs font-medium text-secondary hover:text-foreground focus-visible:text-foreground aria-selected:text-foreground tablet:px-0 tablet:text-base ${mobilePlacement}`}
+                  onClick={() => setSelectedId(category.id)}
+                  onKeyDown={(event) => {
+                    const last = technologyCategories.length - 1
+                    const destinations: Partial<Record<string, number>> = {
+                      ArrowLeft: index === 0 ? last : index - 1,
+                      ArrowRight: index === last ? 0 : index + 1,
+                      Home: 0,
+                      End: last,
+                    }
+                    const nextIndex = destinations[event.key]
+                    if (nextIndex === undefined) return
+                    event.preventDefault()
+                    const next = technologyCategories[nextIndex]
+                    setSelectedId(next.id)
+                    document
+                      .getElementById(`technology-tab-${next.id}`)
+                      ?.focus()
+                  }}
+                >
+                  <span data-underline-label>{category.label}</span>
+                </button>
+              )
+            })}
           </div>
           <div
             id="technology-category-panel"
