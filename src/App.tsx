@@ -5,6 +5,8 @@ import { About } from '@/sections/About'
 import { Hero } from '@/sections/Hero/Hero'
 import { ProfessionalStatus } from '@/sections/ProfessionalStatus'
 import { TechnologyStack } from '@/sections/TechnologyStack'
+import { Experience } from '@/sections/Experience'
+import { SelectedProjects } from '@/sections/SelectedProjects'
 
 export default function App() {
   return (
@@ -20,6 +22,8 @@ export default function App() {
         <ProfessionalStatus />
         <About />
         <TechnologyStack />
+        <Experience />
+        <SelectedProjects />
       </main>
     </div>
   )

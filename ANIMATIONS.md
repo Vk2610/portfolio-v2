@@ -3,6 +3,8 @@ Approved eight patterns: staggered fade-up 600ms/80ms; underline reveal and link
 
 Technology Stack tiles fade up once per category on viewport entry, with a 400ms duration and an 80ms stagger. Tile colours change over 250ms with ease-in-out. Category dividers use the 600ms line expansion. Tooltips use a 200ms hover delay and a 150ms reveal. Reduced motion shows tiles immediately and disables these visual transitions.
 
+Work Experience content reveals once on section entry with a 600ms fade-up and 80ms stagger. Dividers expand over 600ms. Reduced motion keeps all experience content immediately visible.
+
 Hero network: every connection carries an elapsed-time packet with its own phase and slight speed variation. Packets follow the projected endpoints and fade at both ends of their travel. Reduced motion keeps the network static.
 
 Phase 03C network interactions and native SVG rendering use a shared frame loop. Magnetic displacement is bounded to 7px, hover scale targets 1.14, and cursor ring and emphasis transitions use 250ms. The 6px cursor becomes smaller over a node, while a separate 6px orbit dot takes 2500ms per revolution. Pointer parallax is depth dependent and bounded. A hovered node reveals its tooltip after 200ms with a 150ms reveal. Touch and keyboard selection reveal the description directly. Reduced motion suppresses ambient motion, cursor effects, and parallax.

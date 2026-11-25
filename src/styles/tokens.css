@@ -15,6 +15,8 @@
   --section-space: clamp(3rem, 8vw, 7rem);
   --content-width: 80rem;
   --target-size: 44px;
+  --navbar-content-height: 4rem;
+  --navbar-height: calc(var(--navbar-content-height) + 1px);
   --duration-instant: 100ms;
   --duration-fast: 150ms;
   --duration-normal: 250ms;

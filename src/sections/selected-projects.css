@@ -1,0 +1,13 @@
+.project-preview-stage {
+  container-type: inline-size;
+}
+
+.project-preview-frame {
+  --project-cover-width: calc(min(100cqw, clamp(640px, 45vw, 720px)) * 0.7);
+  /* Reserve the same room for metadata, details, and links across projects. */
+  min-block-size: calc(var(--project-cover-width) * 9 / 16 + 12.75rem);
+}
+
+.project-preview-cover {
+  inline-size: var(--project-cover-width);
+}
