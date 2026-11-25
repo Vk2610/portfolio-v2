@@ -1,0 +1,111 @@
+.custom-cursor-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.custom-cursor-spotlight-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  user-select: none;
+  overflow: hidden;
+}
+
+.custom-cursor-spotlight-clone,
+.custom-cursor-spotlight-clone * {
+  color: #000000 !important;
+  background-color: transparent !important;
+  border-color: transparent !important;
+  pointer-events: none !important;
+  user-select: none !important;
+}
+
+.custom-cursor-root {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  will-change: transform, opacity;
+  opacity: 0;
+  transition: opacity var(--duration-fast) var(--ease-standard);
+}
+
+.custom-cursor-root[data-visible='true'] {
+  opacity: 1;
+}
+
+.custom-cursor-shape {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border-radius: 9999px;
+  transform: translate(-50%, -50%) scale(1);
+  transition:
+    width 200ms var(--ease-standard),
+    height 200ms var(--ease-standard),
+    background-color 200ms var(--ease-standard),
+    border-color 200ms var(--ease-standard),
+    transform 200ms var(--ease-standard);
+}
+
+.custom-cursor-root[data-pressed='true'] .custom-cursor-shape {
+  transform: translate(-50%, -50%) scale(0.7);
+  transition:
+    width 200ms var(--ease-standard),
+    height 200ms var(--ease-standard),
+    background-color 200ms var(--ease-standard),
+    border-color 200ms var(--ease-standard),
+    transform var(--duration-instant) var(--ease-standard);
+}
+
+.custom-cursor-shape[data-variant='default'] {
+  width: 6px;
+  height: 6px;
+  background-color: var(--ink-50);
+  border: 1px solid transparent;
+}
+
+.custom-cursor-shape[data-variant='button'] {
+  width: 42px;
+  height: 42px;
+  background-color: transparent;
+  border: 1px solid var(--ink-50);
+}
+
+.custom-cursor-shape[data-variant='nav'] {
+  width: 28px;
+  height: 28px;
+  background-color: transparent;
+  border: 1px solid var(--ink-50);
+}
+
+.custom-cursor-shape[data-variant='heading'] {
+  width: 48px;
+  height: 48px;
+  background-color: #ffffff;
+  border: 1px solid transparent;
+}
+
+/* Hide native cursor only when custom cursor is active and not in native-text or network mode */
+html[data-custom-cursor='active']:not([data-cursor-native='true']),
+html[data-custom-cursor='active']:not([data-cursor-native='true']) * {
+  cursor: none !important;
+}
+
+@media (prefers-reduced-motion: reduce), (hover: none), (pointer: coarse) {
+  .custom-cursor-overlay,
+  .custom-cursor-spotlight-layer {
+    display: none !important;
+  }
+
+  html[data-custom-cursor='active'],
+  html[data-custom-cursor='active'] * {
+    cursor: auto !important;
+  }
+}

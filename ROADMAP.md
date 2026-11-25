@@ -5,7 +5,7 @@
 4. Professional Status, About, categorized technology tiles for all 22 entries in the shared catalog, using the same local SVGs as the Hero network.
 5. Desktop editorial experience/mobile timeline, desktop project index/mobile accordion. Verify shared data and responsive states, actual screenshots.
 6. Contact/footer and SEO metadata. Verify email draft, clipboard fallback, actual external links.
-7. Test keyboard, mobile, reduced motion, 320/390/768/1024/1440px viewports, console errors, images, layout and motion. Vitest and Playwright. Lighthouse targets 95+ performance (aspirational), LCP <=2.5s, CLS <=0.1, smooth 60fps where device allows. Measure, do not claim untested results.
+7. Test keyboard, mobile, reduced motion, 320/390/768/1024/1440px viewports, console errors, images, layout and motion. Vitest and Playwright. Lighthouse targets 95+ performance (aspirational), LCP <=2.5s, CLS <=0.1, smooth 60fps where device allows. Measure, do not claim untested results. Phase 07A.1 adds the centralized global custom cursor system (`src/features/custom-cursor/`).
 8. New GitHub repository (suggested portfolio-v2), separate Vercel project; user approval before push/deploy. Verify production URL and metadata.
 
 ## Suggested source tree

@@ -1,4 +1,6 @@
 export const profile = {
+  email: 'vedantkumbhar82@gmail.com',
+  contactLocation: 'Satara, Maharashtra, India',
   name: 'Vedant Kumbhar',
   title: 'Full Stack Developer',
   description:

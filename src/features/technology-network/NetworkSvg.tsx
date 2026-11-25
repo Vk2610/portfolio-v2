@@ -103,7 +103,11 @@ export function NetworkSvg() {
   }, [])
 
   return (
-    <figure aria-labelledby={captionId} className="absolute inset-0">
+    <figure
+      aria-labelledby={captionId}
+      className="absolute inset-0"
+      data-cursor="network"
+    >
       <motion.div
         ref={controlsRef}
         className="absolute inset-0 motion-reduce:transform-none! motion-reduce:opacity-100!"
