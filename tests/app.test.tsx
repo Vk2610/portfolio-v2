@@ -10,6 +10,7 @@ import {
 } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from '../src/App'
+import { technologies } from '../src/data/technologies'
 
 beforeEach(() => {
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null)
@@ -32,6 +33,83 @@ afterEach(() => {
 })
 
 describe('application shell', () => {
+  it('links to four stack categories with every original SVG and catalog description', async () => {
+    render(<App />)
+    const stack = screen.getByRole('region', { name: 'My toolkit.' })
+    expect(stack.id).toBe('stack')
+    for (const navigation of ['Primary', 'Mobile primary']) {
+      expect(
+        within(screen.getByRole('navigation', { name: navigation })).getByRole(
+          'link',
+          { name: 'Stack' },
+        ),
+      ).toHaveAttribute('href', '#stack')
+    }
+    const lists = within(stack).getAllByRole('list')
+    expect(
+      lists.map((list) => within(list).getAllByRole('button').length),
+    ).toEqual([8, 5, 3, 6])
+    expect(lists[0]).toHaveAccessibleName('Frontend')
+    expect(lists[1]).toHaveAccessibleName('Backend & Data')
+    expect(lists[2]).toHaveAccessibleName('Databases')
+    expect(lists[3]).toHaveAccessibleName('Tools & Platforms')
+    expect(
+      within(stack).getByText(
+        `${technologies.length} TECHNOLOGIES / 04 CATEGORIES`,
+      ),
+    ).toBeInTheDocument()
+    expect(within(stack).getAllByRole('button')).toHaveLength(22)
+
+    await waitFor(() => {
+      expect(stack.querySelectorAll('button svg path')).toHaveLength(22)
+    })
+    for (const technology of technologies) {
+      const button = within(stack).getByRole('button', {
+        name: technology.label,
+      })
+      expect(button).toHaveAccessibleDescription(technology.description)
+      const original = new DOMParser().parseFromString(
+        readFileSync(resolve('public', technology.iconPath), 'utf8'),
+        'image/svg+xml',
+      ).documentElement
+      const svg = button.querySelector('svg')!
+      expect(svg.namespaceURI).toBe('http://www.w3.org/2000/svg')
+      expect(svg).toHaveAttribute('viewBox', original.getAttribute('viewBox'))
+      expect(svg).toHaveAttribute('width', '32')
+      expect(svg).toHaveAttribute('height', '32')
+      expect(svg.childNodes).toHaveLength(original.childNodes.length)
+      Array.from(svg.childNodes).forEach((node, index) => {
+        expect(node.isEqualNode(original.childNodes[index])).toBe(true)
+      })
+      // The current sources have no internal IDs, so Hero and tile clones can coexist.
+      expect(svg.matches('[id]') || svg.querySelector('[id]')).toBeFalsy()
+    }
+  })
+
+  it('opens a tile tooltip on focus and tap activation and dismisses on Escape', async () => {
+    render(<App />)
+    const stack = screen.getByRole('region', { name: 'My toolkit.' })
+    const tile = within(stack).getByRole('button', { name: 'React' })
+    const description = technologies[0].description
+    fireEvent.focus(tile)
+    expect(
+      await screen.findByRole('tooltip', { name: description }),
+    ).toBeInTheDocument()
+    fireEvent.keyDown(document, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('tooltip')).toBeNull())
+    const tap = () => {
+      fireEvent.pointerDown(tile, { pointerType: 'touch' })
+      fireEvent.pointerUp(tile, { pointerType: 'touch' })
+      fireEvent.click(tile, { detail: 1 })
+    }
+    tap()
+    expect(
+      await screen.findByRole('tooltip', { name: description }),
+    ).toBeInTheDocument()
+    tap()
+    await waitFor(() => expect(screen.queryByRole('tooltip')).toBeNull())
+  })
+
   it('renders the hero and approved navigation anchors', () => {
     const { container } = render(<App />)
     const backgrounds = container.querySelectorAll(

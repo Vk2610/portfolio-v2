@@ -29,10 +29,12 @@ function loadIcon(url: string) {
 }
 
 export function loadNetworkIcons(nodes: readonly TechnologyNode[]) {
+  return Promise.all(nodes.map(loadTechnologyIcon))
+}
+
+export function loadTechnologyIcon({ iconPath }: { iconPath: string }) {
   const base = import.meta.env.BASE_URL
-  return Promise.all(
-    nodes.map(({ iconPath }) => loadIcon(`${base}${iconPath}`)),
-  )
+  return loadIcon(`${base}${iconPath}`)
 }
 
 function element<Tag extends keyof SVGElementTagNameMap>(tag: Tag) {

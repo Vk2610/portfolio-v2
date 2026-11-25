@@ -2,7 +2,7 @@ import type { Variants } from 'motion/react'
 import { entranceTransition, motionMilliseconds } from './transitions'
 
 export function staggeredEntrance(
-  pattern: 'fade-up' | 'elements',
+  pattern: 'fade-up' | 'elements' | 'tile',
   reduced: boolean,
 ) {
   const group: Variants = {
@@ -16,7 +16,7 @@ export function staggeredEntrance(
   const item: Variants = {
     hidden: reduced
       ? { opacity: 1, y: 0 }
-      : { opacity: 0, y: pattern === 'fade-up' ? 16 : 8 },
+      : { opacity: 0, y: pattern === 'elements' ? 8 : 16 },
     visible: {
       opacity: 1,
       y: 0,

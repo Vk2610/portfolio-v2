@@ -16,5 +16,9 @@ Pixels. Palette: background #0A0A0A; secondary #111111; surface #171717; hover #
 
 Section identifiers use one Geist Mono line in muted #808080 at 12px on tablet and desktop and 11px on mobile, with consistent weight and no separate display heading: `01 / INTRO`, `02 / ABOUT ME`, `03 / TECHNOLOGY`, `04 / EXPERIENCE`, `05 / SELECTED WORK`, `06 / CONTACT`. Pair each identifier with one primary Geist Sans section heading.
 
+## Technology Stack
+
+Phase 04B uses an editorial grid with category headings beside the tiles on desktop, and headings above the grids on tablet and mobile. Mobile uses three columns. Tiles share a 32px icon box and preserve the local SVG geometry and viewBox. The tiles use the existing monochrome surface, border and text tokens, brighten together on hover or keyboard focus, and use the #D4D4D4 focus outline. Each tile opens a viewport aware tooltip using its catalog description on hover, keyboard focus or tap. Escape dismisses it.
+
 ## Ambient particle background
 Use monochrome foreground ink over the #0A0A0A base, with small dots and short streaks and the foreground content as the visual priority. Adjustable defaults use an enabled feature, 60% reference density, 0.55 speed multiplier, 70% visibility intensity, 90 desktop particles and 40 mobile particles. Tablet counts interpolate between the two. Particle diameters range from 0.5 to 2 CSS px, and the configured opacity bounds are 0.10 to 0.65. There are three depth layers. Visibility intensity shapes the depth-weighted opacity distribution while the configured opacity bounds remain the actual range. Tune the configuration after manual visual review.

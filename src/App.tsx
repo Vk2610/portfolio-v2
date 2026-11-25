@@ -4,6 +4,7 @@ import { NetworkSvg } from '@/features/technology-network/NetworkSvg'
 import { About } from '@/sections/About'
 import { Hero } from '@/sections/Hero/Hero'
 import { ProfessionalStatus } from '@/sections/ProfessionalStatus'
+import { TechnologyStack } from '@/sections/TechnologyStack'
 
 export default function App() {
   return (
@@ -18,6 +19,7 @@ export default function App() {
         <Hero network={<NetworkSvg />} />
         <ProfessionalStatus />
         <About />
+        <TechnologyStack />
       </main>
     </div>
   )
