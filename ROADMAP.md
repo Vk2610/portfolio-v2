@@ -1,8 +1,8 @@
 # Implementation roadmap
 1. Scaffold React TS Vite in a new folder/repo, initialize dependencies and quality tooling. Add docs. Confirm dev/build/lint; no portfolio sections yet.
 2. Design tokens, local Geist, global CSS, container, button/link/section heading primitives and typography sample. Review responsive screenshots.
-3. Navbar and Hero, build network engine separately then integrate orbital cursor; validate drag/touch and reduced motion.
-4. Professional Status, About, categorized technology tiles, actual local SVGs.
+3. Navbar and Hero, build the connected 22-node network with animated packets on every edge, then integrate the orbital cursor separately; validate drag/touch and reduced motion.
+4. Professional Status, About, categorized technology tiles for all 22 entries in the shared catalog, using the same local SVGs as the Hero network.
 5. Desktop editorial experience/mobile timeline, desktop project index/mobile accordion. Verify shared data and responsive states, actual screenshots.
 6. Contact/footer and SEO metadata. Verify email draft, clipboard fallback, actual external links.
 7. Test keyboard, mobile, reduced motion, 320/390/768/1024/1440px viewports, console errors, images, layout and motion. Vitest and Playwright. Lighthouse targets 95+ performance (aspirational), LCP <=2.5s, CLS <=0.1, smooth 60fps where device allows. Measure, do not claim untested results.

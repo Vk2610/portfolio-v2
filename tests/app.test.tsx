@@ -3,12 +3,20 @@ import {
   fireEvent,
   render,
   screen,
+  waitFor,
   within,
 } from '@testing-library/react'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from '../src/App'
 
-afterEach(cleanup)
+beforeEach(() => {
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null)
+})
+
+afterEach(() => {
+  cleanup()
+  vi.restoreAllMocks()
+})
 
 describe('application shell', () => {
   it('renders the hero and approved navigation anchors', () => {
@@ -45,5 +53,16 @@ describe('application shell', () => {
     const menu = screen.getByRole('navigation', { name: 'Mobile primary' })
     fireEvent.click(within(menu).getByRole('link', { name: 'Work' }))
     expect(toggle).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  it('shows the accessible alternative when Canvas 2D is unavailable', async () => {
+    render(<App />)
+    const network = screen.getByRole('figure', { name: /Technology network/ })
+    expect(network).toHaveTextContent(/React, Node\.js/)
+    expect(network).toHaveTextContent(/Next\.js, Pandas/)
+    expect(network).toHaveTextContent(/VS Code, Postman, Figma/)
+    await waitFor(() => {
+      expect(network.querySelector('figcaption')).not.toHaveClass('sr-only')
+    })
   })
 })

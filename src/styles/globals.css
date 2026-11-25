@@ -38,23 +38,43 @@
 }
 
 @utility underline-reveal {
-  text-decoration: underline;
-  text-decoration-thickness: 1px;
-  text-underline-offset: 0.25em;
+  transition: color var(--duration-moderate) var(--ease-standard);
 
-  @media (hover: hover) {
-    text-decoration-color: transparent;
-    transition: text-decoration-color var(--duration-normal)
-      var(--ease-standard);
+  & > [data-underline-label] {
+    position: relative;
 
-    &:hover,
-    &:focus-visible {
-      text-decoration-color: currentColor;
+    &::after {
+      content: '';
+      position: absolute;
+      inset-inline: 0;
+      top: calc(100% + 4px);
+      height: 1px;
+      @apply bg-foreground;
+      pointer-events: none;
+      transform: scaleX(0);
+      transform-origin: right;
+      transition: transform var(--duration-moderate) var(--ease-standard);
+
+      @media (prefers-reduced-motion: reduce) {
+        transition: none;
+      }
     }
   }
 
   @media (prefers-reduced-motion: reduce) {
     transition: none;
+  }
+
+  &:focus-visible > [data-underline-label]::after {
+    transform: scaleX(1);
+    transform-origin: left;
+  }
+
+  @media (hover: hover) {
+    &:hover > [data-underline-label]::after {
+      transform: scaleX(1);
+      transform-origin: left;
+    }
   }
 }
 

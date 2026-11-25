@@ -58,11 +58,7 @@ export function Navbar() {
   return (
     <header className="sticky top-0 z-40 border-b border-line-subtle bg-background">
       <Container className="flex min-h-16 items-center justify-between gap-4">
-        <TextLink
-          href="#top"
-          className="text-foreground"
-          onClick={open ? closeMenu : undefined}
-        >
+        <TextLink href="#top" onClick={open ? closeMenu : undefined}>
           {profile.name}
         </TextLink>
         <nav aria-label="Primary" className="hidden tablet:block">
