@@ -46,6 +46,19 @@ describe('application shell', () => {
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
       'Vedant Kumbhar',
     )
+    expect(
+      screen.getByRole('region', { name: 'Professional status' }),
+    ).toHaveTextContent('Satara, Maharashtra')
+    expect(screen.getByText('02 / ABOUT ME')).toHaveClass(
+      'type-mono',
+      'text-muted',
+    )
+    expect(screen.queryByRole('heading', { name: 'ABOUT ME' })).toBeNull()
+    expect(
+      screen.getByRole('heading', { name: 'A developer across the stack.' }),
+    ).toHaveProperty('tagName', 'H2')
+    expect(screen.getByText('Technologies showcased')).toBeInTheDocument()
+    expect(document.getElementById('about')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'View Projects' })).toHaveAttribute(
       'href',
       '#work',
