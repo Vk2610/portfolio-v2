@@ -1,0 +1,45 @@
+.menu-glyph {
+  position: relative;
+  inline-size: 18px;
+  block-size: 18px;
+}
+
+.menu-glyph::before,
+.menu-glyph::after {
+  content: '';
+  position: absolute;
+  inset: 50% 0 auto;
+  block-size: 1.5px;
+  background: currentColor;
+  transition: transform var(--duration-menu) var(--ease-standard);
+}
+
+.menu-glyph::before {
+  transform: translateY(-4px);
+}
+.menu-glyph::after {
+  transform: translateY(3px);
+}
+.menu-glyph[data-open='true']::before {
+  transform: rotate(45deg);
+}
+.menu-glyph[data-open='true']::after {
+  transform: rotate(-45deg);
+}
+
+.mobile-navigation {
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--duration-moderate) var(--ease-standard);
+}
+
+.mobile-navigation[data-open='true'] {
+  grid-template-rows: 1fr;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menu-glyph::before,
+  .menu-glyph::after,
+  .mobile-navigation {
+    transition: none;
+  }
+}
