@@ -1,9 +1,16 @@
 import {
   networkConnections,
+  networkInteraction,
   networkVisual,
   technologyNodes,
 } from './network-config'
 import type { Point, ProjectedNode, TechnologyNode } from './network.types'
+import {
+  createNetworkInteractions,
+  clampCenter,
+  renderedRadius,
+} from './network-interactions'
+import { createNetworkSvgRenderer } from './network-svg-renderer'
 
 const nodeDiameter = {
   primary: [68.4, 79.2],
@@ -11,59 +18,46 @@ const nodeDiameter = {
   supporting: [36, 42],
 } as const
 const iconMinimum = { primary: 40, core: 26, supporting: 20 } as const
-const imageCache = new Map<string, Promise<HTMLImageElement | null>>()
-
-function loadIcon(url: string) {
-  const cached = imageCache.get(url)
-  if (cached) return cached
-
-  const pending = new Promise<HTMLImageElement | null>((resolve) => {
-    const image = new Image()
-    image.onload = () => resolve(image)
-    image.onerror = () => resolve(null)
-    image.src = url
-  })
-  imageCache.set(url, pending)
-  return pending
-}
-
-export function loadNetworkIcons() {
-  const base = import.meta.env.BASE_URL
-  return Promise.all(
-    technologyNodes.map(({ iconPath }) => loadIcon(`${base}${iconPath}`)),
-  )
-}
-
 export function layoutNetwork(width: number, height: number): ProjectedNode[] {
   const sizeScale = Math.min(1, Math.min(width / 420, height / 360))
   const desktop = width >= 768
   const clearance = desktop
     ? networkVisual.boundaryClearance.desktop
     : networkVisual.boundaryClearance.mobile
-  const largestRadius = 44 * sizeScale
-  const maxFloat = largestRadius * 0.135
-  const cursorClearance = desktop ? largestRadius * 0.14 : 0
-  const paddingX = clearance + largestRadius + maxFloat + cursorClearance
-  const paddingY = clearance + largestRadius + maxFloat
-  const availableWidth = Math.max(0, width - 2 * paddingX)
-  const availableHeight = Math.max(0, height - 2 * paddingY)
+  const availableWidth = Math.max(0, width - 2 * clearance)
+  const availableHeight = Math.max(0, height - 2 * clearance)
 
   return technologyNodes.map((technology) => {
+    const [min, max] = nodeDiameter[technology.tier]
+    const radius = (sizeScale * (min + (max - min) * technology.depth)) / 2
+    const margin =
+      Math.max(
+        radius + clearance,
+        radius * networkInteraction.hoverScale +
+          networkInteraction.ringOffset +
+          networkInteraction.orbitDot / 2,
+      ) +
+      floatAmplitude(radius, technology.depth) +
+      0.5
     const base = {
-      x:
-        paddingX +
-        (0.5 +
+      x: clampCenter(
+        width / 2 +
           (technology.base.x - 0.5) *
             networkVisual.networkSpread *
-            networkVisual.horizontalExpansion) *
-          availableWidth,
-      y:
-        paddingY +
-        (0.5 +
+            networkVisual.horizontalExpansion *
+            availableWidth,
+        width,
+        margin,
+      ),
+      y: clampCenter(
+        height / 2 +
           (technology.base.y - 0.5) *
             networkVisual.networkSpread *
-            networkVisual.verticalExpansion) *
-          availableHeight,
+            networkVisual.verticalExpansion *
+            availableHeight,
+        height,
+        margin,
+      ),
     }
     return {
       technology,
@@ -71,13 +65,7 @@ export function layoutNetwork(width: number, height: number): ProjectedNode[] {
       ambient: { x: 0, y: 0 },
       dragOffset: { x: 0, y: 0 },
       projected: { ...base },
-      radius:
-        (sizeScale *
-          (nodeDiameter[technology.tier][0] +
-            (nodeDiameter[technology.tier][1] -
-              nodeDiameter[technology.tier][0]) *
-              technology.depth)) /
-        2,
+      radius,
       opacity:
         networkVisual.depthOpacity.background +
         (networkVisual.depthOpacity.foreground -
@@ -85,6 +73,12 @@ export function layoutNetwork(width: number, height: number): ProjectedNode[] {
           technology.depth,
     }
   })
+}
+
+function floatAmplitude(radius: number, depth: number) {
+  return (
+    radius * (0.08 + (depth * 0.055 * networkVisual.depthIntensity) / 0.675)
+  )
 }
 
 export function projectNode(
@@ -97,10 +91,7 @@ export function projectNode(
   const speed =
     ((0.42 + node.technology.depth * 0.34) * networkVisual.depthIntensity) /
     0.675
-  const amplitude =
-    node.radius *
-    (0.08 +
-      (node.technology.depth * 0.055 * networkVisual.depthIntensity) / 0.675)
+  const amplitude = floatAmplitude(node.radius, node.technology.depth)
 
   node.ambient.x = staticFrame
     ? 0
@@ -125,11 +116,12 @@ export function projectPacket(
   const dx = to.projected.x - from.projected.x
   const dy = to.projected.y - from.projected.y
   const distance = Math.hypot(dx, dy)
-  const span = distance - from.radius - to.radius
+  const startRadius = renderedRadius(from)
+  const span = distance - startRadius - renderedRadius(to)
   if (span <= 0) return false
 
   // Travel along the visible span so short edges spend less time behind nodes.
-  const fraction = (from.radius + span * progress) / distance
+  const fraction = (startRadius + span * progress) / distance
   position.x = from.projected.x + dx * fraction
   position.y = from.projected.y + dy * fraction
   return true
@@ -150,19 +142,11 @@ function fallbackLabel({ label }: TechnologyNode) {
         .padEnd(2, label[1])
 }
 
-export function createNetworkEngine(canvas: HTMLCanvasElement) {
-  let ctx: CanvasRenderingContext2D | null
-  try {
-    ctx = canvas.getContext('2d')
-  } catch {
-    return null
-  }
-  if (!ctx) return null
-  const context = ctx
-  const palette = getComputedStyle(canvas)
-  const foreground = palette.getPropertyValue('--ink-50').trim()
-  const border = palette.getPropertyValue('--ink-500').trim()
-  const surface = palette.getPropertyValue('--ink-900').trim()
+export function createNetworkEngine(
+  svg: SVGSVGElement,
+  controls?: { root: HTMLElement; tooltip: HTMLElement },
+) {
+  if (typeof SVGSVGElement === 'undefined') return null
   const indices = new Map<string, number>(
     technologyNodes.map(({ id }, index) => [id, index]),
   )
@@ -173,9 +157,23 @@ export function createNetworkEngine(canvas: HTMLCanvasElement) {
   }))
   const labels = technologyNodes.map(fallbackLabel)
   const packetPosition: Point = { x: 0, y: 0 }
+  const drawOrder = technologyNodes
+    .map((_, index) => index)
+    .sort((a, b) => technologyNodes[a].depth - technologyNodes[b].depth)
+  const renderer = createNetworkSvgRenderer(
+    svg,
+    edges.length,
+    drawOrder,
+    labels,
+  )
+  const interactions =
+    controls &&
+    createNetworkInteractions(controls.root, svg, controls.tooltip, () => {
+      if (reduced && ready()) draw()
+    })
 
   let nodes: ProjectedNode[] = []
-  let icons: Awaited<ReturnType<typeof loadNetworkIcons>> | null = null
+  let iconsReady = false
   let width = 0
   let height = 0
   let visible = false
@@ -184,95 +182,103 @@ export function createNetworkEngine(canvas: HTMLCanvasElement) {
   let previousTime: number | null = null
   let frameId: number | null = null
 
-  function dot(x: number, y: number, radius: number) {
-    context.beginPath()
-    context.arc(x, y, radius, 0, Math.PI * 2)
-  }
-
-  function draw() {
-    if (!icons) return
-    context.clearRect(0, 0, width, height)
-
+  function draw(delta = 16) {
     for (let i = 0; i < nodes.length; i++)
-      projectNode(nodes[i], i, elapsed, reduced)
+      if (!interactions?.isDragging(i))
+        projectNode(nodes[i], i, elapsed, reduced)
+    const interaction = interactions?.update(nodes, width, height, delta)
 
-    context.lineWidth = 1
-    context.strokeStyle = border
-    context.globalAlpha = networkVisual.connectionVisibility
-    context.beginPath()
-    for (const edge of edges) {
-      const a = nodes[edge.from].projected
-      const b = nodes[edge.to].projected
-      context.moveTo(a.x, a.y)
-      context.lineTo(b.x, b.y)
-    }
-    context.stroke()
+    renderer.showPackets(!reduced)
+    const packetRadius = width < 380 ? 1.2 : 1.6
+    for (let i = 0; i < edges.length; i++) {
+      const edge = edges[i]
+      const a = nodes[edge.from]
+      const b = nodes[edge.to]
+      const emphasis = Math.min(
+        a.interaction?.emphasis ?? 1,
+        b.interaction?.emphasis ?? 1,
+      )
+      const focus = Math.max(
+        a.interaction?.brightness ?? 0,
+        b.interaction?.brightness ?? 0,
+      )
+      renderer.edge(
+        i,
+        a.projected,
+        b.projected,
+        Math.min(
+          1,
+          networkVisual.connectionVisibility * emphasis + focus * 0.27,
+        ),
+      )
 
-    if (!reduced) {
-      context.fillStyle = foreground
-      const packetRadius = width < 380 ? 1.2 : 1.6
-      for (const edge of edges) {
+      if (!reduced) {
         const t = packetProgress(elapsed, edge.packet.phase, edge.packet.period)
-        if (!projectPacket(packetPosition, nodes[edge.from], nodes[edge.to], t))
-          continue
-        context.globalAlpha = packetOpacity(t)
-        dot(packetPosition.x, packetPosition.y, packetRadius)
-        context.fill()
+        if (projectPacket(packetPosition, a, b, t)) {
+          const opacity = Math.min(
+            1,
+            packetOpacity(t) * (emphasis + focus * 0.45),
+          )
+          renderer.packet(i, packetPosition, packetRadius, opacity)
+        } else {
+          renderer.hidePacket(i)
+        }
       }
     }
 
-    const drawOrder = nodes
-      .map((_, index) => index)
-      .sort((a, b) => nodes[a].technology.depth - nodes[b].technology.depth)
-    for (const i of drawOrder) {
-      const {
-        projected: { x, y },
-        radius,
-        opacity,
-      } = nodes[i]
-      context.globalAlpha = 1
-      context.fillStyle = surface
-      dot(x, y, radius)
-      context.fill()
-      context.globalAlpha =
-        opacity *
-        (0.55 +
-          (0.45 * nodes[i].technology.depth * networkVisual.depthIntensity) /
-            0.675)
-      context.stroke()
-
-      context.globalAlpha = opacity
-      const icon = icons[i]
-      if (icon) {
-        const size = Math.min(
+    renderer.setActive(interaction?.index ?? -1)
+    for (let i = 0; i < nodes.length; i++) {
+      const { projected, radius, opacity, technology } = nodes[i]
+      const emphasis = nodes[i].interaction?.emphasis ?? 1
+      const brightness = nodes[i].interaction?.brightness ?? 0
+      const scale = nodes[i].interaction?.scale ?? 1
+      const strokeOpacity = Math.min(
+        1,
+        emphasis *
+          (opacity *
+            (0.55 +
+              (0.45 * technology.depth * networkVisual.depthIntensity) /
+                0.675) +
+            brightness * 0.23),
+      )
+      const iconSize =
+        Math.min(
           radius * 1.15,
           Math.max(
-            iconMinimum[nodes[i].technology.tier] *
-              (width < 420 ? width / 420 : 1),
+            iconMinimum[technology.tier] * (width < 420 ? width / 420 : 1),
             radius * 0.84,
           ),
-        )
-        context.drawImage(icon, x - size / 2, y - size / 2, size, size)
-      } else {
-        context.fillStyle = foreground
-        context.font = `500 ${Math.max(6, radius * 0.58)}px system-ui`
-        context.textAlign = 'center'
-        context.textBaseline = 'middle'
-        context.fillText(labels[i], x, y, radius * 1.6)
-      }
+        ) * scale
+      renderer.node(
+        i,
+        projected,
+        radius * scale,
+        iconSize,
+        emphasis,
+        strokeOpacity,
+        Math.min(1, opacity + brightness * 0.12) * emphasis,
+      )
     }
-    context.globalAlpha = 1
+
+    if (interactions && interaction) {
+      renderer.cursor(
+        interactions.cursorFrame(elapsed, interaction.cursorActive),
+        networkInteraction.orbitDot / 2,
+      )
+      interactions.syncNativeCursor(interaction.cursorActive)
+    }
   }
 
   function ready() {
-    return visible && icons !== null && width > 0 && height > 0
+    return visible && iconsReady && width > 0 && height > 0
   }
 
   function tick(timestamp: number) {
     frameId = null
-    if (previousTime !== null) elapsed += (timestamp - previousTime) / 1000
+    const delta = previousTime === null ? 16 : timestamp - previousTime
+    if (previousTime !== null) elapsed += delta / 1000
     previousTime = timestamp
-    draw()
+    draw(delta)
     frameId = requestAnimationFrame(tick)
   }
 
@@ -281,41 +287,27 @@ export function createNetworkEngine(canvas: HTMLCanvasElement) {
     frameId = null
     previousTime = null
 
+    interactions?.setActive(ready(), reduced)
     if (!ready()) return
     draw()
     if (!reduced) frameId = requestAnimationFrame(tick)
   }
 
   return {
-    setIcons(loaded: Awaited<ReturnType<typeof loadNetworkIcons>>) {
-      icons = loaded
+    setIcons(loaded: readonly (SVGSVGElement | null)[]) {
+      renderer.setIcons(loaded)
+      iconsReady = true
       update()
     },
-    resize(nextWidth: number, nextHeight: number, pixelRatio: number) {
-      const ratio = Math.min(2, Math.max(1, pixelRatio))
-      const pixelWidth = Math.round(nextWidth * ratio)
-      const pixelHeight = Math.round(nextHeight * ratio)
-      if (
-        nextWidth === width &&
-        nextHeight === height &&
-        canvas.width === pixelWidth &&
-        canvas.height === pixelHeight
-      )
-        return
+    resize(nextWidth: number, nextHeight: number) {
+      if (nextWidth === width && nextHeight === height) return
       width = nextWidth
       height = nextHeight
-      canvas.width = pixelWidth
-      canvas.height = pixelHeight
-      if (width > 0 && height > 0)
-        context.setTransform(
-          pixelWidth / width,
-          0,
-          0,
-          pixelHeight / height,
-          0,
-          0,
-        )
+      renderer.resize(width, height)
+      const previousNodes = nodes
       nodes = layoutNetwork(width, height)
+      for (let i = 0; i < previousNodes.length; i++)
+        nodes[i].dragOffset = previousNodes[i].dragOffset
       update()
     },
     setPlayback(nextVisible: boolean, nextReduced: boolean) {
@@ -327,6 +319,8 @@ export function createNetworkEngine(canvas: HTMLCanvasElement) {
     destroy() {
       visible = false
       update()
+      interactions?.destroy()
+      renderer.destroy()
     },
   }
 }

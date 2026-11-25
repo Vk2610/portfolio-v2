@@ -21,4 +21,12 @@ export type ProjectedNode = {
   projected: Point
   radius: number
   opacity: number
+  interaction?: {
+    scale: number
+    emphasis: number
+    brightness: number
+    parallax: Point
+    magnetic: Point
+    release: Point
+  }
 }

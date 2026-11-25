@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import {
   cleanup,
   fireEvent,
@@ -10,12 +12,22 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from '../src/App'
 
 beforeEach(() => {
-  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null)
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (url: string) => {
+      const source = readFileSync(
+        resolve('public', url.replace(/^\//, '')),
+        'utf8',
+      )
+      return { ok: true, text: async () => source }
+    }),
+  )
 })
 
 afterEach(() => {
   cleanup()
   vi.restoreAllMocks()
+  vi.unstubAllGlobals()
 })
 
 describe('application shell', () => {
@@ -55,7 +67,8 @@ describe('application shell', () => {
     expect(toggle).toHaveAttribute('aria-expanded', 'false')
   })
 
-  it('shows the accessible alternative when Canvas 2D is unavailable', async () => {
+  it('shows the accessible alternative when native SVG is unavailable', async () => {
+    vi.stubGlobal('SVGSVGElement', undefined)
     render(<App />)
     const network = screen.getByRole('figure', { name: /Technology network/ })
     expect(network).toHaveTextContent(/React, Node\.js/)
@@ -64,5 +77,18 @@ describe('application shell', () => {
     await waitFor(() => {
       expect(network.querySelector('figcaption')).not.toHaveClass('sr-only')
     })
+  })
+  it('mounts 22 vector logos and 35 edges with keyboard controls and no Canvas', async () => {
+    render(<App />)
+    const network = screen.getByRole('figure', { name: /Technology network/ })
+    await waitFor(() => {
+      expect(network.querySelectorAll('svg svg > path')).toHaveLength(22)
+      expect(within(network).getAllByRole('button')).toHaveLength(22)
+    })
+    expect(network.querySelectorAll('line')).toHaveLength(35)
+    expect(network.querySelector('canvas')).toBeNull()
+    expect(
+      within(network).getByRole('button', { name: 'MySQL' }),
+    ).toHaveAccessibleDescription()
   })
 })

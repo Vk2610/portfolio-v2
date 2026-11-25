@@ -14,50 +14,155 @@ import {
   projectNode,
   projectPacket,
 } from '../src/features/technology-network/network-engine'
+import {
+  clampCenter,
+  clientToNetwork,
+  createNetworkInteractions,
+  hitNode,
+  magneticTarget,
+} from '../src/features/technology-network/network-interactions'
+
+describe('network pointer geometry', () => {
+  it('preserves the grabbed point on a touch drag and releases capture on cleanup', () => {
+    const root = document.createElement('div')
+    root.innerHTML =
+      '<svg></svg><button data-network-node></button><div hidden><strong></strong><span></span></div>'
+    const button = root.querySelector('button')!
+    const svg = root.querySelector('svg')!
+    Object.defineProperty(svg, 'getScreenCTM', {
+      value: () => ({
+        a: 2,
+        b: 0,
+        c: 0,
+        d: 2,
+        inverse: () => ({ a: 0.5, b: 0, c: 0, d: 0.5, e: -25, f: -40 }),
+      }),
+    })
+    button.setPointerCapture = vi.fn()
+    button.hasPointerCapture = vi.fn(() => true)
+    button.releasePointerCapture = vi.fn()
+    const node = layoutNetwork(568, 544)[0]
+    const { x, y } = node.base
+    const control = createNetworkInteractions(
+      root,
+      svg,
+      root.querySelector('div')!,
+      vi.fn(),
+    )
+    const dispatch = (type: string, clientX: number, clientY: number) => {
+      button.dispatchEvent(
+        Object.assign(new Event(type, { bubbles: true, cancelable: true }), {
+          pointerId: 7,
+          pointerType: 'touch',
+          button: 0,
+          clientX: 2 * clientX + 50,
+          clientY: 2 * clientY + 80,
+        }),
+      )
+    }
+    control.setActive(true, true)
+    control.update([node], 568, 544, 16)
+    dispatch('pointerdown', x + 5, y + 3)
+    dispatch('pointermove', x + 25, y + 13)
+    control.update([node], 568, 544, 16)
+    expect(node.projected).toEqual({ x: x + 20, y: y + 10 })
+    dispatch('pointerup', x + 25, y + 13)
+    expect(node.dragOffset).toEqual({ x: 20, y: 10 })
+    dispatch('pointerdown', x + 20, y + 10)
+    control.destroy()
+    expect(button.releasePointerCapture).toHaveBeenCalledTimes(2)
+  })
+
+  it('maps client coordinates through a translated, scaled SVG screen matrix', () => {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+    Object.defineProperty(svg, 'getScreenCTM', {
+      value: () => ({
+        a: 2,
+        b: 0,
+        c: 0,
+        d: 2,
+        inverse: () => ({ a: 0.5, b: 0, c: 0, d: 0.5, e: -25, f: -40 }),
+      }),
+    })
+    expect(clientToNetwork(svg, 130, 140, 288, 256)).toEqual({ x: 40, y: 30 })
+  })
+
+  it('projects into an aspect-ratio preserving viewBox without a screen matrix', () => {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+    vi.spyOn(svg, 'getBoundingClientRect').mockReturnValue({
+      left: 30,
+      top: 40,
+      width: 400,
+      height: 200,
+    } as DOMRect)
+    expect(clientToNetwork(svg, 170, 100, 100, 100)).toEqual({ x: 20, y: 30 })
+  })
+
+  it('hits rendered nodes and retains hover near a moving boundary', () => {
+    const [node] = layoutNetwork(568, 544)
+    const { x, y } = node.projected
+    expect(hitNode([node], { x, y })).toBe(0)
+    const near = { x: x + node.radius + 4, y }
+    expect(hitNode([node], near)).toBe(-1)
+    expect(hitNode([node], near, 0)).toBe(0)
+  })
+
+  it('bounds diagonal attraction and clamps drag centres inside the margin', () => {
+    const delta = magneticTarget(Math.hypot(60, 60), 60)
+    expect(Math.hypot(delta, delta)).toBeCloseTo(7)
+    expect(clampCenter(-10, 200, 30)).toBe(30)
+    expect(clampCenter(201, 200, 30)).toBe(170)
+    expect(clampCenter(10, 40, 30)).toBe(20)
+  })
+})
 
 describe('technology network rendering', () => {
-  it('draws all nodes, handles failed logos and stops scheduling frames when paused', () => {
-    const context = {
-      setTransform: vi.fn(),
-      clearRect: vi.fn(),
-      beginPath: vi.fn(),
-      moveTo: vi.fn(),
-      lineTo: vi.fn(),
-      arc: vi.fn(),
-      fill: vi.fn(),
-      stroke: vi.fn(),
-      drawImage: vi.fn(),
-      fillText: vi.fn(),
-    }
-    const canvas = document.createElement('canvas')
-    vi.spyOn(canvas, 'getContext').mockReturnValue(
-      context as unknown as CanvasRenderingContext2D,
-    )
+  it('renders stable native SVG elements, preserves logo fallback and pauses animation', () => {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+    const logo = document.createElementNS(
+      svg.namespaceURI,
+      'svg',
+    ) as SVGSVGElement
+    logo.setAttribute('viewBox', '0 0 24 24')
+    logo.append(document.createElementNS(svg.namespaceURI, 'path'))
     const requestFrame = vi.fn().mockReturnValue(42)
     const cancelFrame = vi.fn()
     vi.stubGlobal('requestAnimationFrame', requestFrame)
     vi.stubGlobal('cancelAnimationFrame', cancelFrame)
 
     try {
-      const engine = createNetworkEngine(canvas)!
-      engine.resize(288, 256, 3)
-      expect(canvas.width).toBe(576)
-      expect(canvas.height).toBe(512)
-      expect(context.setTransform).toHaveBeenCalledWith(2, 0, 0, 2, 0, 0)
+      const engine = createNetworkEngine(svg)!
+      engine.resize(288, 256)
+      expect(svg.getAttribute('viewBox')).toBe('0 0 288 256')
+      expect(svg.querySelectorAll('canvas')).toHaveLength(0)
       engine.setIcons(
-        technologyNodes.map((_, index) => (index === 0 ? null : new Image())),
+        technologyNodes.map((_, index) => (index === 0 ? null : logo)),
       )
-      expect(context.clearRect).not.toHaveBeenCalled()
 
       engine.setPlayback(true, true)
-      expect(context.drawImage).toHaveBeenCalledTimes(21)
-      expect(context.fillText).toHaveBeenCalledTimes(1)
-      expect(context.arc).toHaveBeenCalledTimes(22)
+      expect(svg.querySelectorAll('line')).toHaveLength(35)
+      expect(
+        svg.querySelectorAll('[data-network-glyph] > circle'),
+      ).toHaveLength(22)
+      expect(svg.querySelectorAll('svg > path')).toHaveLength(21)
+      expect(svg.querySelector('text')?.textContent).toBe('Re')
+      const packets = svg.querySelector<SVGGElement>('[data-network-packets]')!
+      expect(packets.style.display).toBe('none')
       expect(requestFrame).not.toHaveBeenCalled()
 
-      context.arc.mockClear()
+      const firstLine = svg.querySelector('line')
+      engine.resize(358, 256)
+      expect(svg.getAttribute('viewBox')).toBe('0 0 358 256')
+      engine.resize(288, 256)
       engine.setPlayback(true, false)
-      expect(context.arc).toHaveBeenCalledTimes(22 + networkConnections.length)
+      expect(packets.style.display).toBe('')
+      expect(packets.children).toHaveLength(35)
+      expect(
+        Array.from(packets.children).every((packet) =>
+          packet.hasAttribute('cx'),
+        ),
+      ).toBe(true)
+      expect(svg.querySelector('line')).toBe(firstLine)
       expect(requestFrame).toHaveBeenCalledTimes(1)
       engine.setPlayback(false, false)
       expect(cancelFrame).toHaveBeenCalledWith(42)
@@ -65,6 +170,7 @@ describe('technology network rendering', () => {
 
       engine.setPlayback(true, false)
       engine.destroy()
+      expect(svg.childElementCount).toBe(0)
       expect(cancelFrame).toHaveBeenCalledTimes(2)
     } finally {
       vi.unstubAllGlobals()

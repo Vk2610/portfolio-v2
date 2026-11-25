@@ -9,7 +9,7 @@
 8. New GitHub repository (suggested portfolio-v2), separate Vercel project; user approval before push/deploy. Verify production URL and metadata.
 
 ## Suggested source tree
-src/components/ui, common, layout; src/sections/{Hero,ProfessionalStatus,About,TechStack,Experience,Projects,Contact}; src/features/technology-network/{NetworkCanvas.tsx,network-engine.ts,network-interactions.ts,network-config.ts,network.types.ts,OrbitalCursor.tsx}; src/animations/{variants,transitions}.ts; src/data/{profile,technologies,experience,projects}.ts; src/hooks; src/lib; src/types; src/styles/{globals,tokens}.css; src/App.tsx; src/main.tsx; public/{images,fonts,icons/technologies}; tests. Adjust only with justification.
+src/components/ui, common, layout; src/sections/{Hero,ProfessionalStatus,About,TechStack,Experience,Projects,Contact}; src/features/technology-network/{NetworkSvg.tsx,network-svg-renderer.ts,network-engine.ts,network-interactions.ts,network-config.ts,network.types.ts,OrbitalCursor.tsx}; src/animations/{variants,transitions}.ts; src/data/{profile,technologies,experience,projects}.ts; src/hooks; src/lib; src/types; src/styles/{globals,tokens}.css; src/App.tsx; src/main.tsx; public/{images,fonts,icons/technologies}; tests. Adjust only with justification.
 
 ## Phase 1 acceptance
 New repository folder distinct from original, package lock, TypeScript strict configuration, Vite dev and production build working, Tailwind v4 Vite integration, lint and format scripts, shadcn initialized with compatible aliases, motion/lucide installed, test scaffolding. Verify installed dependencies rather than guessing. No implementation beyond minimal shell. Report commands and results. Do not push or deploy.

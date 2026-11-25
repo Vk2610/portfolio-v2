@@ -1,6 +1,21 @@
 import { technologies, type TechnologyId } from '@/data/technologies'
 import type { NetworkConnection, TechnologyNode } from './network.types'
 
+export const networkInteraction = {
+  hoverScale: 1.14,
+  magneticLimit: 7,
+  transition: 250,
+  ringOffset: 8,
+  orbitDot: 6,
+  orbitDuration: 2500,
+  cursorDot: 6,
+  unrelatedOpacity: 0.32,
+  tooltipDelay: 200,
+  tooltipReveal: 150,
+  parallaxLimit: 9,
+  dragThreshold: 6,
+} as const
+
 export const networkVisual = {
   depthIntensity: 0.675,
   networkSpread: 0.925,
@@ -15,28 +30,28 @@ export const networkVisual = {
 
 // Curated normalized positions keep related technologies interwoven.
 const placements = {
-  react: [0.39, 0.42, 0.98],
-  nodedotjs: [0.61, 0.56, 0.96],
-  javascript: [0.49, 0.25, 0.76],
-  typescript: [0.35, 0.63, 0.84],
-  express: [0.76, 0.39, 0.76],
-  mongodb: [0.86, 0.54, 0.68],
-  mysql: [0.76, 0.73, 0.66],
-  postgresql: [0.87, 0.75, 0.64],
-  tailwindcss: [0.19, 0.42, 0.78],
-  github: [0.53, 0.83, 0.78],
-  vercel: [0.68, 0.85, 0.69],
-  python: [0.9, 0.3, 0.72],
-  html5: [0.23, 0.22, 0.43],
-  css3: [0.1, 0.58, 0.52],
-  bootstrap: [0.27, 0.78, 0.42],
-  nextdotjs: [0.55, 0.13, 0.62],
-  pandas: [0.98, 0.57, 0.47],
-  firebase: [0.67, 0.23, 0.57],
-  git: [0.36, 0.91, 0.43],
-  visualstudiocode: [0.4, 0.75, 0.56],
-  postman: [0.98, 0.4, 0.48],
-  figma: [0.13, 0.27, 0.4],
+  react: [0.532, 0.638, 0.98],
+  nodedotjs: [0.53, 0.33, 0.96],
+  javascript: [0.34, 0.29, 0.76],
+  typescript: [0.11, 0.91, 0.84],
+  express: [0.776, 0.326, 0.76],
+  mongodb: [0.745, 0.52, 0.68],
+  mysql: [0.737, 0.712, 0.66],
+  postgresql: [0.918, 0.865, 0.64],
+  tailwindcss: [0.16, 0.49, 0.78],
+  github: [0.508, 0.972, 0.78],
+  vercel: [0.675, 0.903, 0.69],
+  python: [1, 0.16, 0.72],
+  html5: [0.209, 0.159, 0.43],
+  css3: [0, 0.69, 0.52],
+  bootstrap: [0.242, 0.665, 0.42],
+  nextdotjs: [0.647, 0.186, 0.62],
+  pandas: [1, 0.701, 0.47],
+  firebase: [0.729, 0, 0.57],
+  git: [0.32, 0.91, 0.43],
+  visualstudiocode: [0.338, 0.725, 0.56],
+  postman: [0.994, 0.468, 0.48],
+  figma: [0.041, 0.251, 0.4],
 } as const satisfies Record<TechnologyId, readonly [number, number, number]>
 
 export const technologyNodes: readonly TechnologyNode[] = technologies.map(
