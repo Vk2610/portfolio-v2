@@ -12,6 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from '../src/App'
 
 beforeEach(() => {
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null)
   vi.stubGlobal(
     'fetch',
     vi.fn(async (url: string) => {
@@ -32,7 +33,13 @@ afterEach(() => {
 
 describe('application shell', () => {
   it('renders the hero and approved navigation anchors', () => {
-    render(<App />)
+    const { container } = render(<App />)
+    const backgrounds = container.querySelectorAll(
+      'canvas[data-particle-background]',
+    )
+    expect(backgrounds).toHaveLength(1)
+    expect(backgrounds[0]).toHaveAttribute('aria-hidden', 'true')
+    expect(backgrounds[0]).toHaveClass('pointer-events-none')
     expect(
       screen.getByRole('main', { name: 'Portfolio application' }),
     ).toBeInTheDocument()
