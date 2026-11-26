@@ -1,6 +1,7 @@
 import { Navbar } from '@/components/layout/Navbar'
 import { CustomCursor } from '@/features/custom-cursor/CustomCursor'
 import { ParticleBackground } from '@/features/particle-background/ParticleBackground'
+import { RobotCompanion } from '@/features/robot-companion/RobotCompanion'
 import { NetworkSvg } from '@/features/technology-network/NetworkSvg'
 import { About } from '@/sections/About'
 import { Hero } from '@/sections/Hero/Hero'
@@ -29,6 +30,7 @@ export default function App() {
         <SelectedProjects />
         <Contact />
       </main>
+      <RobotCompanion />
     </div>
   )
 }
