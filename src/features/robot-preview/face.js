@@ -46,6 +46,8 @@ function expressionEye(parent, centerX, depth) {
       side: { value: Math.sign(centerX) },
       cyan: { value: new Color('#77f4ff') },
       glow: { value: new Color('#2ddaf5') },
+      angryColor: { value: new Color('#ff3344') },
+      angryGlow: { value: new Color('#cc1124') },
     },
     vertexShader: `
       attribute vec2 localEye;
@@ -62,6 +64,8 @@ function expressionEye(parent, centerX, depth) {
       uniform float side;
       uniform vec3 cyan;
       uniform vec3 glow;
+      uniform vec3 angryColor;
+      uniform vec3 angryGlow;
 
       void main() {
         vec2 p = eye;
@@ -83,7 +87,10 @@ function expressionEye(parent, centerX, depth) {
         float halo = exp(-max(shape, 0.0) * 58.0) * normalWeight
           + exp(-max(concentric, 0.0) * 54.0) * mixWeights.z;
         float fade = 1.0 - smoothstep(0.79, 1.0, length(p / vec2(0.36, 0.40)));
-        gl_FragColor = vec4(mix(glow, cyan, core),
+        float angryMix = clamp(mixWeights.w, 0.0, 1.0);
+        vec3 baseColor = mix(cyan, angryColor, angryMix);
+        vec3 baseGlow = mix(glow, angryGlow, angryMix);
+        gl_FragColor = vec4(mix(baseGlow, baseColor, core),
           clamp(core + 0.27 * halo * (1.0 - core), 0.0, 1.0) * fade);
         if (gl_FragColor.a < 0.002) discard;
         #include <colorspace_fragment>

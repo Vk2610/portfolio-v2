@@ -137,6 +137,8 @@ export function useCursor() {
       const shape = shapeRef.current
       const spec = CURSOR_VARIANTS[variant]
       const hideGlobal = Boolean(spec.hideGlobalCursor)
+      const robotActive = html.hasAttribute('data-cursor-robot')
+      const showGlobal = visible && !hideGlobal && !robotActive
 
       if (hideGlobal) {
         html.setAttribute('data-cursor-native', 'true')
@@ -145,7 +147,7 @@ export function useCursor() {
       }
 
       if (root) {
-        root.dataset.visible = visible && !hideGlobal ? 'true' : 'false'
+        root.dataset.visible = showGlobal ? 'true' : 'false'
         root.dataset.variant = variant
         root.dataset.pressed = pressed ? 'true' : 'false'
       }
@@ -153,7 +155,7 @@ export function useCursor() {
         shape.dataset.variant = variant
       }
 
-      if (!visible || hideGlobal || variant !== 'heading') {
+      if (!showGlobal || variant !== 'heading') {
         clearSpotlightClone()
       }
     }
@@ -219,11 +221,16 @@ export function useCursor() {
       }
     }
 
+    const handleRobotCursorChange = () => {
+      applyState(currentVariant, isVisible, isPressed)
+    }
+
     window.addEventListener('pointermove', handlePointerMove, { passive: true })
     window.addEventListener('pointerdown', handlePointerDown, { passive: true })
     window.addEventListener('pointerup', handlePointerUp, { passive: true })
     window.addEventListener('pointercancel', handleHide, { passive: true })
     window.addEventListener('blur', handleHide)
+    window.addEventListener('portfolio:robot-cursor', handleRobotCursorChange)
     document.documentElement.addEventListener('pointerleave', handleHide)
     document.addEventListener('visibilitychange', handleVisibilityChange)
 
@@ -236,6 +243,10 @@ export function useCursor() {
       window.removeEventListener('pointerup', handlePointerUp)
       window.removeEventListener('pointercancel', handleHide)
       window.removeEventListener('blur', handleHide)
+      window.removeEventListener(
+        'portfolio:robot-cursor',
+        handleRobotCursorChange,
+      )
       document.documentElement.removeEventListener('pointerleave', handleHide)
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }

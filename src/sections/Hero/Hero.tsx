@@ -2,7 +2,7 @@ import {
   DecodeIdentifier,
   RevealHeading,
 } from '@/components/common/TypographyEntrance'
-import type { ReactNode } from 'react'
+import { useRef, type ReactNode } from 'react'
 import { ArrowDownRight } from 'lucide-react'
 import { motion, useReducedMotion } from 'motion/react'
 import { staggeredEntrance } from '@/animations/variants'
@@ -11,14 +11,20 @@ import { ButtonLink } from '@/components/ui/Button'
 import { Icon } from '@/components/ui/Icon'
 import { TextLink } from '@/components/ui/TextLink'
 import { profile } from '@/data/profile'
+import { HeroRobot } from '@/features/hero-robot/HeroRobot'
 
 export function Hero({ network }: { network?: ReactNode }) {
   const reduced = useReducedMotion() ?? false
   const { group, item } = staggeredEntrance('fade-up', reduced)
+  const containerRef = useRef<HTMLDivElement>(null)
 
   return (
     <Section aria-labelledby="hero-title">
-      <div className="grid items-center gap-8 tablet:grid-cols-[0.9fr_1.1fr] tablet:gap-8 desktop:grid-cols-[0.4fr_0.6fr] desktop:gap-7">
+      <div
+        ref={containerRef}
+        className="relative grid items-center gap-8 tablet:grid-cols-[0.9fr_1.1fr] tablet:gap-8 desktop:grid-cols-[0.4fr_0.6fr] desktop:gap-7"
+      >
+        <HeroRobot containerRef={containerRef} />
         <div className="min-w-0">
           <DecodeIdentifier onMount className="type-mono mb-4 text-secondary">
             01 / INTRO
