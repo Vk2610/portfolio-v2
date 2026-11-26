@@ -53,6 +53,7 @@ export function createFallPhysics(rig, initial = physicsDefaults) {
   let hitStrongly = false
   let grounded = false
   let supportHeight = 0
+  let impactSpeed = 0
 
   const parts = rig.hitMeshes
     .filter((part) => weights[part.name])
@@ -131,6 +132,7 @@ export function createFallPhysics(rig, initial = physicsDefaults) {
     stableFor = 0
     impacted = false
     hitStrongly = false
+    impactSpeed = 0
     grounded = false
   }
 
@@ -221,7 +223,79 @@ export function createFallPhysics(rig, initial = physicsDefaults) {
     currentPosition.copy(position)
     currentRotation.copy(quaternion)
     supportHeight = floorAt(position.x, position.z, position.y + 0.08)
+    impactSpeed = 0
     updateParts(true)
+  }
+
+  function prepareFlight() {
+    if (!dynamic) {
+      start({ velocity: { x: 0, y: 0.55, z: 0 }, roll: { x: 0, y: 0, z: 0 } })
+      return
+    }
+    impacted = false
+    hitStrongly = false
+    stableFor = 0
+    grounded = false
+    impactSpeed = 0
+    dynamic.setAngvel({ x: 0, y: 0, z: 0 }, true)
+  }
+
+  function controlFlight(target, dt, landing = false) {
+    if (!dynamic || !target) return
+    const position = dynamic.translation()
+    const velocity = dynamic.linvel()
+    const desired = {
+      x: Math.max(-1.25, Math.min(1.25, (target.x - position.x) * 1.8)),
+      y: Math.max(
+        landing ? -0.9 : -0.35,
+        Math.min(landing ? 0.9 : 2.15, (target.y - position.y) * 1.7),
+      ),
+      z: Math.max(-0.8, Math.min(0.8, (target.z - position.z) * 1.8)),
+    }
+    const gain = landing ? 3.8 : 4.5
+    const force = {
+      x: (desired.x - velocity.x) * gain * options.mass,
+      y: ((desired.y - velocity.y) * gain + options.gravity) * options.mass,
+      z: (desired.z - velocity.z) * gain * options.mass,
+    }
+    dynamic.addForce(force, true)
+    const angularVelocity = dynamic.angvel()
+    const damping = Math.exp(-Math.min(dt, 0.05) * 4)
+    dynamic.setAngvel({
+      x: angularVelocity.x * damping,
+      y: angularVelocity.y * damping,
+      z: angularVelocity.z * damping,
+    }, true)
+  }
+
+  function dragTo(position) {
+    if (!dynamic) prepareFlight()
+    dynamic.setTranslation(position, true)
+    dynamic.setLinvel({ x: 0, y: 0, z: 0 }, true)
+    dynamic.setAngvel({ x: 0, y: 0, z: 0 }, true)
+    priorPosition.set(position.x, position.y, position.z)
+    currentPosition.copy(priorPosition)
+    priorRotation.copy(rig.root.quaternion)
+    currentRotation.copy(prigRotation())
+    accumulator = 0
+    grounded = false
+    stableFor = 0
+    updateParts()
+  }
+
+  function prigRotation() {
+    return rig.root.quaternion
+  }
+
+  function releaseDrag(velocity) {
+    if (!dynamic) return
+    dynamic.setLinvel(velocity, true)
+    dynamic.setAngvel({ x: 0, y: 0, z: 0 }, true)
+    impacted = false
+    hitStrongly = false
+    impactSpeed = 0
+    stableFor = 0
+    grounded = false
   }
 
   function advance(dt) {
@@ -254,6 +328,7 @@ export function createFallPhysics(rig, initial = physicsDefaults) {
                 rotationBefore > 2.2)
             ) {
               impacted = true
+              impactSpeed = speedBefore
               hitStrongly =
                 speedBefore > 0.95 || rotationBefore > 1.25 || upY < 0.62
             }
@@ -275,7 +350,15 @@ export function createFallPhysics(rig, initial = physicsDefaults) {
     rig.root.quaternion
       .copy(settled ? currentRotation : priorRotation)
       .slerp(currentRotation, settled ? 1 : alpha)
-    return { grounded, impacted, hitStrongly, settled, supportHeight, elapsed }
+    return {
+      grounded,
+      impacted,
+      hitStrongly,
+      settled,
+      supportHeight,
+      impactSpeed,
+      elapsed,
+    }
   }
 
   function configure(next) {
@@ -294,6 +377,10 @@ export function createFallPhysics(rig, initial = physicsDefaults) {
 
   return {
     start,
+    prepareFlight,
+    controlFlight,
+    dragTo,
+    releaseDrag,
     clear,
     advance,
     configure,
