@@ -223,10 +223,10 @@ describe('application shell', () => {
     expect(
       screen.getByRole('region', { name: 'Professional status' }),
     ).toHaveTextContent(profile.location)
-    expect(screen.getByText('02 / ABOUT ME')).toHaveClass(
-      'type-mono',
-      'text-muted',
-    )
+    const aboutIdentifier = screen
+      .getAllByText('02 / ABOUT ME')
+      .find((element) => !element.hasAttribute('aria-hidden'))
+    expect(aboutIdentifier?.closest('p')).toHaveClass('type-mono', 'text-muted')
     expect(screen.queryByRole('heading', { name: 'ABOUT ME' })).toBeNull()
     expect(
       screen.getByRole('heading', { name: 'A developer across the stack.' }),

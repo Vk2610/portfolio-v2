@@ -1,3 +1,7 @@
+import {
+  DecodeIdentifier,
+  RevealHeading,
+} from '@/components/common/TypographyEntrance'
 import { useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { ArrowUpRight, Plus } from 'lucide-react'
@@ -38,16 +42,12 @@ export function SelectedProjects() {
         whileInView="visible"
         viewport={{ once: true }}
       >
-        <motion.p variants={heading.item} className="type-mono text-muted">
+        <DecodeIdentifier className="type-mono text-muted">
           05 / SELECTED WORK
-        </motion.p>
-        <motion.h2
-          variants={heading.item}
-          id="work-heading"
-          className="type-h2 mt-7 desktop:mt-2"
-        >
+        </DecodeIdentifier>
+        <RevealHeading id="work-heading" className="type-h2 mt-7 desktop:mt-2">
           Things I've built.
-        </motion.h2>
+        </RevealHeading>
         <motion.p
           variants={heading.item}
           className="mt-4 max-w-[65ch] text-secondary desktop:mt-2"

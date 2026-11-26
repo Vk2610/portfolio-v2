@@ -1,4 +1,8 @@
 import {
+  DecodeIdentifier,
+  RevealHeading,
+} from '@/components/common/TypographyEntrance'
+import {
   AnimatePresence,
   motion,
   useIsPresent,
@@ -81,10 +85,12 @@ export function TechnologyStack() {
       aria-labelledby="stack-heading"
       className="scroll-mt-16"
     >
-      <p className="type-mono whitespace-nowrap text-muted">03 / TECHNOLOGY</p>
-      <h2 id="stack-heading" className="type-h2 mt-7">
+      <DecodeIdentifier className="type-mono text-muted">
+        03 / TECHNOLOGY
+      </DecodeIdentifier>
+      <RevealHeading id="stack-heading" className="type-h2 mt-7">
         My toolkit.
-      </h2>
+      </RevealHeading>
       <p className="mt-4 text-secondary">
         Technologies I work with to build modern, scalable applications.
       </p>

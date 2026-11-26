@@ -8,6 +8,8 @@
 7. Test keyboard, mobile, reduced motion, 320/390/768/1024/1440px viewports, console errors, images, layout and motion. Vitest and Playwright. Lighthouse targets 95+ performance (aspirational), LCP <=2.5s, CLS <=0.1, smooth 60fps where device allows. Measure, do not claim untested results. Phase 07A.1 adds the centralized global custom cursor system (`src/features/custom-cursor/`).
 8. New GitHub repository (suggested portfolio-v2), separate Vercel project; user approval before push/deploy. Verify production URL and metadata.
 
+Phase 07A.2 implements the Hero name mask (850ms with 135ms stagger), title focus reveal (800ms after 450ms), first-view section heading masks (600ms with 75ms stagger), and identifier decoding (550ms, 40ms refresh). Reduced motion displays final text immediately. Manual desktop and mobile verification is pending.
+
 ## Suggested source tree
 src/components/ui, common, layout; src/sections/{Hero,ProfessionalStatus,About,TechStack,Experience,Projects,Contact}; src/features/particle-background/{ParticleBackground.tsx,particle-config.ts,particle-engine.ts}; src/features/technology-network/{NetworkSvg.tsx,network-svg-renderer.ts,network-engine.ts,network-interactions.ts,network-config.ts,network.types.ts,OrbitalCursor.tsx}; src/animations/{variants,transitions}.ts; src/data/{profile,technologies,experience,projects}.ts; src/hooks; src/lib; src/types; src/styles/{globals,tokens}.css; src/App.tsx; src/main.tsx; public/{images,fonts,icons/technologies}; tests. Adjust only with justification.
 

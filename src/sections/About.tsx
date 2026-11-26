@@ -1,3 +1,7 @@
+import {
+  DecodeIdentifier,
+  RevealHeading,
+} from '@/components/common/TypographyEntrance'
 import { motion, useInView, useReducedMotion } from 'motion/react'
 import { useRef } from 'react'
 import { staggeredEntrance } from '@/animations/variants'
@@ -28,14 +32,17 @@ export function About() {
         animate={reveal}
         className="grid gap-8 desktop:grid-cols-[0.8fr_1.2fr] desktop:gap-16"
       >
-        <motion.div variants={item}>
-          <p className="type-mono whitespace-nowrap text-muted">
+        <div>
+          <DecodeIdentifier className="type-mono text-muted">
             02 / ABOUT ME
-          </p>
-          <h2 id="about-heading" className="type-h2 mt-7 max-w-[12ch]">
+          </DecodeIdentifier>
+          <RevealHeading
+            id="about-heading"
+            className="type-h2 mt-7 max-w-[12ch]"
+          >
             A developer across the stack.
-          </h2>
-        </motion.div>
+          </RevealHeading>
+        </div>
         <motion.div variants={group} className="space-y-5 desktop:pt-1">
           {profile.about.map((paragraph) => (
             <motion.p

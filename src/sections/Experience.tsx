@@ -1,3 +1,7 @@
+import {
+  DecodeIdentifier,
+  RevealHeading,
+} from '@/components/common/TypographyEntrance'
 import { motion, useInView, useReducedMotion } from 'motion/react'
 import { useRef } from 'react'
 import { staggeredEntrance } from '@/animations/variants'
@@ -18,10 +22,12 @@ export function Experience() {
       aria-labelledby="experience-heading"
       className="scroll-mt-16 py-16 tablet:py-20"
     >
-      <p className="type-mono whitespace-nowrap text-muted">04 / EXPERIENCE</p>
-      <h2 id="experience-heading" className="type-h2 mt-7">
+      <DecodeIdentifier className="type-mono text-muted">
+        04 / EXPERIENCE
+      </DecodeIdentifier>
+      <RevealHeading id="experience-heading" className="type-h2 mt-7">
         Where I've worked.
-      </h2>
+      </RevealHeading>
       <div className="mt-8">
         <SectionDivider />
         {experience.map((entry) => (

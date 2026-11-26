@@ -1,3 +1,7 @@
+import {
+  DecodeIdentifier,
+  RevealHeading,
+} from '@/components/common/TypographyEntrance'
 import type { ReactNode } from 'react'
 import { ArrowDownRight } from 'lucide-react'
 import { motion, useReducedMotion } from 'motion/react'
@@ -16,11 +20,15 @@ export function Hero({ network }: { network?: ReactNode }) {
     <Section aria-labelledby="hero-title">
       <div className="grid items-center gap-8 tablet:grid-cols-[0.9fr_1.1fr] tablet:gap-8 desktop:grid-cols-[0.4fr_0.6fr] desktop:gap-7">
         <div className="min-w-0">
-          <p className="type-mono mb-4 text-secondary">01 / INTRO</p>
-          <h1 id="hero-title" className="type-hero" data-cursor="heading">
+          <DecodeIdentifier onMount className="type-mono mb-4 text-secondary">
+            01 / INTRO
+          </DecodeIdentifier>
+          <RevealHeading as="h1" id="hero-title" className="type-hero">
             {profile.name}
-          </h1>
-          <p className="type-h3 mt-4 text-secondary">{profile.title}</p>
+          </RevealHeading>
+          <p className="type-focus-reveal type-h3 mt-4 text-secondary">
+            {profile.title}
+          </p>
           <motion.div
             variants={group}
             initial={reduced ? false : 'hidden'}

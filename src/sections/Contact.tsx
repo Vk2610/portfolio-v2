@@ -1,3 +1,7 @@
+import {
+  DecodeIdentifier,
+  RevealHeading,
+} from '@/components/common/TypographyEntrance'
 import { useEffect, useRef, useState } from 'react'
 import { ArrowUpRight, Check, Copy, Mail, MapPin } from 'lucide-react'
 import { motion, useReducedMotion } from 'motion/react'
@@ -70,16 +74,12 @@ export function Contact() {
           whileInView="visible"
           viewport={{ once: true }}
         >
-          <motion.p variants={heading.item} className="type-mono text-muted">
+          <DecodeIdentifier className="type-mono text-muted">
             06 / CONTACT
-          </motion.p>
-          <motion.h2
-            variants={heading.item}
-            id="contact-heading"
-            className="type-h2 mt-7"
-          >
+          </DecodeIdentifier>
+          <RevealHeading id="contact-heading" className="type-h2 mt-7">
             Good things start with a conversation.
-          </motion.h2>
+          </RevealHeading>
           <motion.p
             variants={heading.item}
             className="mt-4 max-w-[55ch] text-secondary"
