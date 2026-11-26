@@ -6,6 +6,12 @@ import { physicsDefaults } from '@/features/robot-preview/fall-physics.js'
 import { createMovement } from '@/features/robot-preview/movement.js'
 import { computeHeroRobotPlacement } from '@/features/hero-robot/hero-robot-placement'
 import {
+  createFlightController,
+  DESCENDING_DURATION,
+  TAKEOFF_DURATION,
+  TARGET_HOVER_HEIGHT,
+} from '@/features/hero-robot/flight-controller'
+import {
   createMagneticRobotCursor,
   interpolateParticleColor,
 } from '@/features/hero-robot/magnetic-cursor'
@@ -168,5 +174,91 @@ describe('hero robot placement', () => {
     )
     expect(Math.abs(euler2.y)).toBeCloseTo(Math.PI / 2, 2)
     expect(robot.root.position.toArray()).toEqual(initialPos)
+  })
+
+  it('transitions flight states GROUNDED -> TAKEOFF -> HOVERING -> DESCENDING -> GROUNDED', () => {
+    const flight = createFlightController()
+    expect(flight.getState()).toBe('GROUNDED')
+    expect(flight.step(0.016, false).boosterIntensity).toBe(0)
+
+    expect(flight.startTakeoff()).toBe(true)
+    expect(flight.startTakeoff()).toBe(false)
+    expect(flight.getState()).toBe('TAKEOFF')
+
+    // Mid-takeoff has knee bend and ramping booster
+    const early = flight.step(0.15, false)
+    expect(early.kneeBend).toBeGreaterThan(0)
+    expect(early.boosterIntensity).toBeGreaterThan(0)
+
+    // Complete takeoff into hovering
+    flight.step(TAKEOFF_DURATION, false)
+    expect(flight.getState()).toBe('HOVERING')
+    const hover = flight.step(0.1, false)
+    expect(hover.hoverOffset).toBeCloseTo(TARGET_HOVER_HEIGHT, 0)
+    expect(hover.boosterIntensity).toBeGreaterThan(0.6)
+
+    // Land back to platform
+    expect(flight.startLanding()).toBe(true)
+    expect(flight.getState()).toBe('DESCENDING')
+    flight.step(DESCENDING_DURATION + 0.05, false)
+    expect(flight.getState()).toBe('GROUNDED')
+    const landed = flight.step(0.016, false)
+    expect(landed.hoverOffset).toBe(0)
+    expect(landed.boosterIntensity).toBe(0)
+  })
+
+  it('completes repeated powered flight cycles with visible ignition and descent', () => {
+    const flight = createFlightController()
+    for (let cycle = 0; cycle < 5; cycle++) {
+      expect(flight.startTakeoff()).toBe(true)
+      let takeoff = flight.step(0.3, false)
+      expect(takeoff.isFlying).toBe(true)
+      expect(takeoff.boosterIntensity).toBeGreaterThan(0.5)
+      takeoff = flight.step(TAKEOFF_DURATION, false)
+      expect(takeoff.state).toBe('HOVERING')
+      expect(takeoff.hoverOffset).toBeGreaterThan(0.8)
+      expect(takeoff.boosterIntensity).toBeGreaterThan(0.6)
+      expect(flight.startLanding()).toBe(true)
+      const descent = flight.step(0.25, false)
+      expect(descent.state).toBe('DESCENDING')
+      expect(descent.isFlying).toBe(true)
+      flight.step(DESCENDING_DURATION, false)
+      expect(flight.getState()).toBe('GROUNDED')
+      expect(flight.step(0.016, false).boosterIntensity).toBe(0)
+    }
+  })
+
+  it('tracks continuous scrolling, reversals and hover without restarting takeoff', () => {
+    const flight = createFlightController()
+    flight.startTakeoff()
+    flight.setScrolling(true)
+    expect(flight.step(TAKEOFF_DURATION + 0.01, false).state).toBe('TRAVELLING')
+    expect(flight.step(0.1, false).boosterIntensity).toBeGreaterThan(0.6)
+    flight.setScrolling(false)
+    expect(flight.step(0.1, false).state).toBe('HOVERING')
+    expect(flight.getInactiveTime()).toBeGreaterThan(0)
+    flight.setScrolling(true)
+    expect(flight.step(0.1, false).state).toBe('TRAVELLING')
+    expect(flight.getState()).toBe('TRAVELLING')
+  })
+
+  it('approaches and lands, then permits a new journey without resetting flight state', () => {
+    const flight = createFlightController()
+    flight.startTakeoff()
+    flight.step(TAKEOFF_DURATION + 0.01, false)
+    flight.setScrolling(false)
+    flight.step(2.51, false)
+    expect(flight.approach()).toBe(true)
+    expect(flight.step(0.2, false).state).toBe('APPROACHING')
+    flight.setScrolling(true)
+    expect(flight.step(0.1, false).state).toBe('TRAVELLING')
+    flight.setScrolling(false)
+    flight.step(2.51, false)
+    expect(flight.approach()).toBe(true)
+    flight.step(1.01, false)
+    expect(flight.getState()).toBe('LANDING')
+    flight.step(0.91, false)
+    expect(flight.getState()).toBe('GROUNDED')
+    expect(flight.startTakeoff()).toBe(true)
   })
 })

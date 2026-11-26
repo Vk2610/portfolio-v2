@@ -13,6 +13,20 @@ interface RobotTelemetry {
   minX: number
   maxX: number
   supportLost: boolean
+  flightState?: string
+  hoverHeight?: number
+  boosterIntensity?: number
+  booster?: {
+    forced: boolean
+    intensity: number
+    visible: boolean
+    worldPositions: number[][]
+  }
+  scrollDirection?: string
+  scrollVelocity?: number
+  scrollInactiveMs?: number
+  viewportPosition?: { x: number; y: number }
+  targetPosition?: { x: number; y: number } | null
 }
 
 const DEFAULT_ROBOT_HALF_WIDTH = 0.55
@@ -22,6 +36,7 @@ export function SurfaceDebugOverlay() {
   const [surfaces, setSurfaces] = useState<WorldSurface[]>([])
   const [selectedId, setSelectedId] = useState('hero-platform-1')
   const [telemetry, setTelemetry] = useState<RobotTelemetry | null>(null)
+  const [forceNitro, setForceNitro] = useState(false)
 
   useEffect(() => {
     if (!enabled) return
@@ -55,6 +70,8 @@ export function SurfaceDebugOverlay() {
       const detail = (event as CustomEvent<RobotTelemetry>).detail
       if (detail) setTelemetry(detail)
     }
+    const handleForceState = (event: Event) =>
+      setForceNitro(Boolean((event as CustomEvent<boolean>).detail))
 
     const observer = new MutationObserver(schedule)
     observer.observe(document.body, {
@@ -65,6 +82,7 @@ export function SurfaceDebugOverlay() {
     window.addEventListener('resize', schedule)
     window.addEventListener('scroll', schedule, { passive: true })
     window.addEventListener('portfolio:robot-telemetry', handleTelemetry)
+    window.addEventListener('portfolio:force-nitro-state', handleForceState)
     schedule()
 
     return () => {
@@ -73,6 +91,10 @@ export function SurfaceDebugOverlay() {
       window.removeEventListener('resize', schedule)
       window.removeEventListener('scroll', schedule)
       window.removeEventListener('portfolio:robot-telemetry', handleTelemetry)
+      window.removeEventListener(
+        'portfolio:force-nitro-state',
+        handleForceState,
+      )
     }
   }, [enabled, selectedId])
 
@@ -142,10 +164,71 @@ export function SurfaceDebugOverlay() {
                 Reset to Hero
               </button>
             </div>
+            <button
+              type="button"
+              aria-pressed={forceNitro}
+              onClick={() => {
+                const enabled = !forceNitro
+                setForceNitro(enabled)
+                window.dispatchEvent(
+                  new CustomEvent('portfolio:force-nitro', {
+                    detail: { enabled },
+                  }),
+                )
+              }}
+              className="rounded border border-cyan-500/70 px-2 py-1 text-left text-cyan-300"
+            >
+              {forceNitro ? 'Force Nitro: ON' : 'Force Nitro'}
+            </button>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                disabled={
+                  telemetry?.flightState != null &&
+                  telemetry.flightState !== 'GROUNDED'
+                }
+                onClick={() =>
+                  window.dispatchEvent(
+                    new CustomEvent('portfolio:flight-takeoff'),
+                  )
+                }
+                className="rounded border border-cyan-500/70 px-2 py-1 text-cyan-300 disabled:opacity-40"
+              >
+                Takeoff
+              </button>
+              <button
+                type="button"
+                disabled={
+                  telemetry?.flightState !== 'HOVERING' &&
+                  telemetry?.flightState !== 'TAKEOFF'
+                }
+                onClick={() =>
+                  window.dispatchEvent(new CustomEvent('portfolio:flight-land'))
+                }
+                className="rounded border border-cyan-500/70 px-2 py-1 text-cyan-300 disabled:opacity-40"
+              >
+                Land
+              </button>
+            </div>
             {telemetry && (
               <div className="text-[10px] text-muted">
                 <div>
                   Active: {telemetry.platformId} ({telemetry.state})
+                </div>
+                <div>
+                  Boosters: {telemetry.booster?.visible ? 'visible' : 'hidden'}{' '}
+                  · {Math.round((telemetry.booster?.intensity ?? 0) * 100)}% ·{' '}
+                  {JSON.stringify(telemetry.booster?.worldPositions ?? [])}
+                </div>
+                <div>
+                  Scroll: {telemetry.scrollDirection ?? 'none'} ·{' '}
+                  {(telemetry.scrollVelocity ?? 0).toFixed(0)} px/s · idle{' '}
+                  {(telemetry.scrollInactiveMs ?? 0).toFixed(0)}ms
+                </div>
+                <div>
+                  Flight: {telemetry.flightState ?? 'GROUNDED'} · Hover:{' '}
+                  {(telemetry.hoverHeight ?? 0).toFixed(2)}u · Booster:{' '}
+                  {Math.round((telemetry.boosterIntensity ?? 0) * 100)}%
                 </div>
                 <div>
                   Bounds: [{telemetry.minX.toFixed(2)},{' '}
