@@ -8,7 +8,9 @@ import './styles/globals.css'
 const Preview =
   import.meta.env.DEV && window.location.pathname === '/design-system'
     ? React.lazy(() => import('./DesignSystemPreview'))
-    : null
+    : import.meta.env.DEV && window.location.pathname === '/robot-preview'
+      ? React.lazy(() => import('./features/robot-preview/RobotPreview'))
+      : null
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
