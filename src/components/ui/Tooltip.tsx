@@ -20,14 +20,17 @@ export const TooltipTrigger = Primitive.Trigger
 export function TooltipContent({
   className = '',
   sideOffset = 8,
+  variant = 'default',
   ...props
-}: ComponentProps<typeof Primitive.Content>) {
+}: ComponentProps<typeof Primitive.Content> & {
+  variant?: 'default' | 'technology'
+}) {
   return (
     <Primitive.Portal>
       <Primitive.Content
         {...props}
         sideOffset={sideOffset}
-        className={`tooltip-reveal type-caption z-50 max-w-[min(16rem,var(--radix-tooltip-content-available-width))] rounded-md border border-line bg-surface px-3 py-2 text-foreground ${className}`}
+        className={`${variant === 'technology' ? 'technology-metadata' : 'tooltip-reveal type-caption z-50 max-w-[min(16rem,var(--radix-tooltip-content-available-width))] rounded-md border border-line bg-surface px-3 py-2 text-foreground'} ${className}`}
       />
     </Primitive.Portal>
   )

@@ -18,6 +18,10 @@ Section identifiers use one Geist Mono line in muted #808080 at 12px on tablet a
 
 ## Technology Stack
 
+Phase 07A.3 adds grouped focus within the active icon grid. The active technology is white, and its peers dim to 40%. The technical tooltip uses Geist Mono with an uppercase name and type, a divider and a concise description. It uses a 190px preferred width, square corners and a white left accent on the monochrome surface.
+
+The primary CTA has a 4px radius and a white border. Its dark fill rolls upward with a curved edge, and the text and icon follow the moving colour boundary.
+
 The Technology Stack uses five evenly distributed categories in one responsive navigation row: Frontend, Backend, Database, Languages and Tools & Others. Frontend is selected initially. The selected category is shown with white text and its own persistent animated underline. The Stack presents 23 technologies from the shared catalog, including SQL, while the Hero network keeps its approved 22 nodes. Only the selected category's borderless icon grid is displayed, with three columns on mobile, four on tablet and eight on wide desktop. Each tile preserves its local SVG geometry in a 36px box and opens an accessible tooltip with the catalog description.
 
 ## Ambient particle background

@@ -8,6 +8,8 @@ function technology<Id extends string>(
   tier: TechnologyTier,
   category: TechnologyCategory,
   description: string,
+  type: string,
+  stackDescription: string,
 ) {
   return {
     id,
@@ -15,6 +17,8 @@ function technology<Id extends string>(
     tier,
     category,
     description,
+    type,
+    stackDescription,
     iconPath: `icons/technologies/${id}.svg`,
   } as const
 }
@@ -26,6 +30,8 @@ export const technologies = [
     'primary',
     'frontend',
     'Library for building component-based user interfaces.',
+    'UI library',
+    'Component-based user interfaces.',
   ),
   technology(
     'nodedotjs',
@@ -33,6 +39,8 @@ export const technologies = [
     'primary',
     'backend',
     'JavaScript runtime for servers and command-line tools.',
+    'JavaScript runtime',
+    'Server-side application development.',
   ),
   technology(
     'javascript',
@@ -40,6 +48,8 @@ export const technologies = [
     'core',
     'frontend',
     'Programming language for interactive web applications.',
+    'Programming language',
+    'Interactive web applications.',
   ),
   technology(
     'typescript',
@@ -47,6 +57,8 @@ export const technologies = [
     'core',
     'frontend',
     'JavaScript with static type checking.',
+    'Programming language',
+    'Type-safe JavaScript development.',
   ),
   technology(
     'express',
@@ -54,6 +66,8 @@ export const technologies = [
     'core',
     'backend',
     'Framework for HTTP servers and APIs in Node.js.',
+    'Web framework',
+    'REST APIs and backend services.',
   ),
   technology(
     'mongodb',
@@ -61,6 +75,8 @@ export const technologies = [
     'core',
     'databases',
     'Document database for flexible records.',
+    'Document database',
+    'Flexible document storage.',
   ),
   technology(
     'mysql',
@@ -68,6 +84,8 @@ export const technologies = [
     'core',
     'databases',
     'Relational database queried with SQL.',
+    'Relational database',
+    'Structured relational data management.',
   ),
   technology(
     'postgresql',
@@ -75,6 +93,8 @@ export const technologies = [
     'core',
     'databases',
     'Relational database with advanced SQL and extensibility.',
+    'Relational database',
+    'Advanced relational data management.',
   ),
   technology(
     'tailwindcss',
@@ -82,6 +102,8 @@ export const technologies = [
     'core',
     'frontend',
     'Utility-first CSS framework for styling interfaces.',
+    'CSS framework',
+    'Utility-first interface development.',
   ),
   technology(
     'github',
@@ -89,6 +111,8 @@ export const technologies = [
     'core',
     'tools',
     'Platform for hosting and collaborating on Git repositories.',
+    'Development platform',
+    'Repository hosting and collaboration.',
   ),
   technology(
     'vercel',
@@ -96,6 +120,8 @@ export const technologies = [
     'core',
     'tools',
     'Platform for deploying web applications.',
+    'Deployment platform',
+    'Web application deployment.',
   ),
   technology(
     'python',
@@ -103,6 +129,8 @@ export const technologies = [
     'core',
     'data',
     'Programming language used for automation and data analysis.',
+    'Programming language',
+    'Automation and machine learning.',
   ),
   technology(
     'sql',
@@ -110,6 +138,8 @@ export const technologies = [
     'supporting',
     'databases',
     'Structured Query Language for querying and managing relational databases.',
+    'Query language',
+    'Relational database queries.',
   ),
   technology(
     'html5',
@@ -117,6 +147,8 @@ export const technologies = [
     'supporting',
     'frontend',
     'Markup for structuring web pages.',
+    'Markup language',
+    'Semantic web content.',
   ),
   technology(
     'css3',
@@ -124,6 +156,8 @@ export const technologies = [
     'supporting',
     'frontend',
     'Style sheets for web layout and presentation.',
+    'Stylesheet language',
+    'Responsive layouts and styling.',
   ),
   technology(
     'bootstrap',
@@ -131,6 +165,8 @@ export const technologies = [
     'supporting',
     'frontend',
     'Responsive UI framework with reusable styles and components.',
+    'UI framework',
+    'Responsive components and layouts.',
   ),
   technology(
     'nextdotjs',
@@ -138,6 +174,8 @@ export const technologies = [
     'supporting',
     'frontend',
     'React framework with routing and server rendering.',
+    'React framework',
+    'Full-stack React applications.',
   ),
   technology(
     'pandas',
@@ -145,6 +183,8 @@ export const technologies = [
     'supporting',
     'data',
     'Python library for working with tabular data.',
+    'Python library',
+    'Data analysis and manipulation.',
   ),
   technology(
     'firebase',
@@ -152,6 +192,8 @@ export const technologies = [
     'supporting',
     'backend',
     'Backend platform with authentication, data storage and hosting.',
+    'Backend platform',
+    'Authentication and application services.',
   ),
   technology(
     'git',
@@ -159,6 +201,8 @@ export const technologies = [
     'supporting',
     'tools',
     'Distributed version control system.',
+    'Version control',
+    'Source code version management.',
   ),
   technology(
     'visualstudiocode',
@@ -166,6 +210,8 @@ export const technologies = [
     'supporting',
     'tools',
     'Code editor with debugging and extension support.',
+    'Code editor',
+    'Development and debugging.',
   ),
   technology(
     'postman',
@@ -173,6 +219,8 @@ export const technologies = [
     'supporting',
     'tools',
     'Tool for sending and testing API requests.',
+    'API tool',
+    'API development and testing.',
   ),
   technology(
     'figma',
@@ -180,6 +228,8 @@ export const technologies = [
     'supporting',
     'tools',
     'Collaborative interface design and prototyping tool.',
+    'Design tool',
+    'Interface design and prototyping.',
   ),
 ] as const
 

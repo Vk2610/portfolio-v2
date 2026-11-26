@@ -16,6 +16,7 @@ import { TechnologyTile } from '@/components/common/TechnologyTile'
 import { Section } from '@/components/layout/Section'
 import { TooltipProvider } from '@/components/ui/Tooltip'
 import { technologyCategories } from '@/data/technology-categories'
+import type { TechnologyId } from '@/data/technologies'
 
 function TechnologyGrid({
   category,
@@ -26,6 +27,9 @@ function TechnologyGrid({
 }) {
   const present = useIsPresent()
   const { group, item } = staggeredEntrance('tile', reduced)
+  const [hovered, setHovered] = useState<TechnologyId | null>(null)
+  const [open, setOpen] = useState<TechnologyId | null>(null)
+  const emphasized = hovered ?? open
 
   return (
     <motion.div
@@ -47,10 +51,12 @@ function TechnologyGrid({
     >
       <motion.ul
         aria-labelledby="technology-category-heading"
-        className="grid grid-cols-3 content-start justify-items-center gap-x-3 gap-y-8 tablet:grid-cols-4 desktop:grid-cols-8"
+        className="technology-grid grid grid-cols-3 content-start justify-items-center gap-x-3 gap-y-8 tablet:grid-cols-4 desktop:grid-cols-8"
+        data-group-active={emphasized !== null}
         variants={group}
         initial={reduced ? false : 'hidden'}
         animate="visible"
+        onPointerLeave={() => setHovered(null)}
       >
         {category.technologies.map((technology) => (
           <motion.li
@@ -58,7 +64,34 @@ function TechnologyGrid({
             variants={item}
             className="w-full min-w-0"
           >
-            <TechnologyTile technology={technology} />
+            <TechnologyTile
+              technology={technology}
+              present={present}
+              open={present && open === technology.id}
+              emphasis={
+                emphasized === null
+                  ? 'normal'
+                  : emphasized === technology.id
+                    ? 'active'
+                    : 'dimmed'
+              }
+              onHover={() => {
+                setHovered(technology.id)
+                setOpen((previous) =>
+                  previous === technology.id ? previous : null,
+                )
+              }}
+              onOpenChange={(next) => {
+                if (!present) return
+                setOpen((previous) =>
+                  next
+                    ? technology.id
+                    : previous === technology.id
+                      ? null
+                      : previous,
+                )
+              }}
+            />
           </motion.li>
         ))}
       </motion.ul>
@@ -94,7 +127,7 @@ export function TechnologyStack() {
       <p className="mt-4 text-secondary">
         Technologies I work with to build modern, scalable applications.
       </p>
-      <TooltipProvider skipDelayDuration={0}>
+      <TooltipProvider delayDuration={200} skipDelayDuration={0}>
         <div className="mt-10">
           <SectionDivider />
           <div

@@ -186,7 +186,8 @@ describe('application shell', () => {
     render(<App />)
     const stack = screen.getByRole('region', { name: 'My toolkit.' })
     const tile = within(stack).getByRole('button', { name: 'React' })
-    const description = technologies[0].description
+    const { type, stackDescription } = technologies[0]
+    const description = `${type}. ${stackDescription}`
     fireEvent.focus(tile)
     expect(
       await screen.findByRole('tooltip', { name: description }),

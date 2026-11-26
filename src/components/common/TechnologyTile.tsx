@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useId, useRef } from 'react'
 import { DatabaseSearch } from 'lucide-react'
 import {
   Tooltip,
@@ -7,11 +7,25 @@ import {
 } from '@/components/ui/Tooltip'
 import type { Technology } from '@/data/technologies'
 import { loadTechnologyIcon } from '@/features/technology-network/network-svg-renderer'
+import './technology-metadata.css'
 
-export function TechnologyTile({ technology }: { technology: Technology }) {
+export function TechnologyTile({
+  technology,
+  present,
+  open,
+  emphasis,
+  onHover,
+  onOpenChange,
+}: {
+  technology: Technology
+  present: boolean
+  open: boolean
+  emphasis: 'normal' | 'active' | 'dimmed'
+  onHover: () => void
+  onOpenChange: (open: boolean) => void
+}) {
   const icon = useRef<HTMLSpanElement>(null)
   const descriptionId = useId()
-  const [open, setOpen] = useState(false)
   const openOnPress = useRef<boolean | null>(null)
 
   useEffect(() => {
@@ -34,12 +48,16 @@ export function TechnologyTile({ technology }: { technology: Technology }) {
   }, [technology])
 
   return (
-    <Tooltip open={open} onOpenChange={setOpen}>
+    <Tooltip open={open} onOpenChange={onOpenChange}>
       <TooltipTrigger asChild>
         <button
           type="button"
           aria-describedby={descriptionId}
-          className="group flex h-20 w-full cursor-pointer flex-col items-center justify-center gap-2 px-1 text-secondary transition-colors duration-(--duration-normal) ease-in-out hover:text-foreground focus-visible:text-foreground focus-visible:outline-focus motion-reduce:transition-none"
+          data-emphasis={emphasis}
+          className="technology-tile group flex h-20 w-full cursor-pointer flex-col items-center justify-center gap-2 px-1 text-secondary transition-[color,opacity] duration-(--duration-normal) ease-in-out data-[emphasis=active]:text-foreground data-[emphasis=dimmed]:opacity-40 focus-visible:text-foreground focus-visible:outline-focus motion-reduce:transition-none"
+          onPointerEnter={(event) => {
+            if (event.pointerType === 'mouse') onHover()
+          }}
           onPointerDownCapture={() => {
             // Radix closes an open tooltip on pointer-down before click fires.
             openOnPress.current = open
@@ -52,13 +70,13 @@ export function TechnologyTile({ technology }: { technology: Technology }) {
             const wasOpen =
               event.detail > 0 ? (openOnPress.current ?? open) : open
             openOnPress.current = null
-            setOpen(!wasOpen)
+            onOpenChange(!wasOpen)
           }}
         >
           <span
             ref={icon}
             aria-hidden="true"
-            className="grid size-9 shrink-0 place-items-center fill-current transition-transform duration-(--duration-normal) ease-in-out motion-safe:group-hover:-translate-y-[3px] motion-reduce:transition-none [&_path[fill='#fafafa']]:fill-current [&_svg[fill='#fafafa']]:fill-current"
+            className="technology-tile-icon grid size-9 shrink-0 place-items-center fill-current transition-transform duration-(--duration-normal) ease-in-out motion-safe:group-data-[emphasis=active]:-translate-y-[3px] motion-reduce:transition-none [&_path[fill='#fafafa']]:fill-current [&_svg[fill='#fafafa']]:fill-current"
           >
             {technology.id === 'sql' && (
               <DatabaseSearch
@@ -76,10 +94,21 @@ export function TechnologyTile({ technology }: { technology: Technology }) {
       <span id={descriptionId} className="sr-only">
         {technology.description}
       </span>
-      <TooltipContent aria-label={technology.description} collisionPadding={12}>
-        <strong className="block font-medium">{technology.label}</strong>
-        {technology.description}
-      </TooltipContent>
+      {present && (
+        <TooltipContent
+          variant="technology"
+          aria-label={`${technology.type}. ${technology.stackDescription}`}
+          side="top"
+          collisionPadding={12}
+        >
+          <strong className="technology-metadata-name">
+            {technology.label}
+          </strong>
+          <span className="technology-metadata-type">{technology.type}</span>
+          <span className="technology-metadata-divider" aria-hidden="true" />
+          <span>{technology.stackDescription}</span>
+        </TooltipContent>
+      )}
     </Tooltip>
   )
 }
