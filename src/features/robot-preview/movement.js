@@ -84,9 +84,6 @@ export function createMovement(robot, physics, emotions, physicsOptions) {
   let sequence = null
   let currentPhysics = null
   let stopYaw = null
-  let flight = null
-  let dragging = false
-  let softLanding = null
 
   const goal = new Vector3()
   const pole = new Vector3()
@@ -107,10 +104,6 @@ export function createMovement(robot, physics, emotions, physicsOptions) {
     'settling',
     'dizzy reaction',
     'recovering',
-    'powered flight',
-    'landing approach',
-    'soft landing',
-    'dragging',
   ])
   const isLocked = () => physicalStates.has(state)
 
@@ -142,7 +135,7 @@ export function createMovement(robot, physics, emotions, physicsOptions) {
   }
 
   function gait(dt, time, reduced) {
-    const intended = route ? 0 : (stopYaw ?? yaw)
+    const intended = route ? (route * Math.PI) / 2 : (stopYaw ?? yaw)
     const difference = wrap(intended - yaw)
     const ready = Math.abs(difference) < 0.012
     const canWalk = emotion === 'neutral'
@@ -156,7 +149,8 @@ export function createMovement(robot, physics, emotions, physicsOptions) {
     root.quaternion.setFromAxisAngle(yAxis, yaw)
     walkMix = damp(walkMix, desired || speed > 0.028 ? 1 : 0, 12, dt)
     const movement = speed > 0.014 ? speed * dt : 0
-    root.position.x += route * movement
+    root.position.x += Math.sin(yaw) * movement
+    root.position.z += Math.cos(yaw) * movement
     const support = physics.floorAt(
       root.position.x,
       root.position.z,
@@ -232,7 +226,7 @@ export function createMovement(robot, physics, emotions, physicsOptions) {
     if (canWalk) {
       if (!ready && speed < 0.035) setState('turning')
       else if (route || speed > 0.03)
-        setState(route < 0 ? 'walking left' : 'walking right')
+        setState(Math.sin(yaw) < 0 ? 'walking left' : 'walking right')
       else setState('idle')
     } else if (emotion === 'happy' || fold < 0.005) setState('idle')
   }
@@ -370,83 +364,6 @@ export function createMovement(robot, physics, emotions, physicsOptions) {
     floor = currentPhysics.supportHeight
     physics.clear()
     currentPhysics = null
-  }
-
-  function beginPoweredFlight(target) {
-    if (
-      dragging ||
-      ['recovering', 'dizzy reaction', 'losing balance'].includes(state) ||
-      jump
-    )
-      return false
-    if (state === 'falling' || state === 'impact' || state === 'settling')
-      physics.prepareFlight()
-    else
-      physics.start({
-        velocity: { x: 0, y: 0.45, z: 0 },
-        roll: { x: 0, y: 0, z: 0 },
-      })
-    route = speed = walkMix = 0
-    jump = null
-    yaw = 0
-    flight = { target: { ...target }, landing: false, thrust: 1 }
-    hit = false
-    currentPhysics = null
-    emotions.resetEmotion()
-    setState('powered flight')
-    return true
-  }
-
-  function setFlightTarget(target) {
-    if (!flight || !target) return false
-    flight.target = { ...target }
-    flight.landing = true
-    if (state === 'powered flight') setState('landing approach')
-    return true
-  }
-
-  function endPoweredFlight() {
-    if (!flight) return false
-    flight = null
-    currentPhysics = null
-    hit = false
-    setState('falling')
-    return true
-  }
-
-  function startDrag() {
-    if (dragging) return true
-    dragging = true
-    flight = null
-    route = speed = walkMix = 0
-    jump = null
-    yaw = 0
-    root.quaternion.setFromAxisAngle(yAxis, 0)
-    physics.prepareFlight()
-    currentPhysics = null
-    hit = false
-    emotions.resetEmotion()
-    setState('dragging')
-    return true
-  }
-
-  function dragTo(position) {
-    if (!dragging) return false
-    physics.dragTo(position)
-    root.position.set(position.x, position.y, position.z)
-    root.quaternion.identity()
-    return true
-  }
-
-  function endDrag(velocity = { x: 0, y: 0, z: 0 }) {
-    if (!dragging) return false
-    dragging = false
-    physics.releaseDrag(velocity)
-    flight = null
-    currentPhysics = null
-    hit = false
-    setState('falling')
-    return true
   }
 
   function physicalPose(amount, balance = false) {
@@ -616,69 +533,6 @@ export function createMovement(robot, physics, emotions, physicsOptions) {
       physicalPose(p, true)
       keepAboveGround()
       if (age >= 0.3) launchFall()
-    } else if (state === 'dragging') {
-      const brace = reduced ? 0.14 : 0.19
-      for (const { arm, leg, sign } of sides) {
-        rig.offset(arm.upper, -0.12, 0, sign * brace)
-        rig.offset(arm.joint, -0.08, 0, 0)
-        rig.offset(leg.upper, -0.025, 0, 0)
-        rig.offset(leg.joint, 0.04, 0, 0)
-      }
-    } else if (state === 'powered flight' || state === 'landing approach') {
-      const landingApproach = state === 'landing approach'
-      physics.controlFlight(flight?.target, dt, landingApproach)
-      currentPhysics = physics.advance(dt)
-      const armSpread = landingApproach ? 0.24 : 0.32
-      for (const { arm, leg, sign } of sides) {
-        rig.offset(arm.upper, -0.16, 0, sign * armSpread)
-        rig.offset(arm.joint, -0.08, 0, 0)
-        rig.offset(leg.upper, -0.035, 0, 0)
-        rig.offset(leg.joint, 0.08, 0, 0)
-      }
-      const target = flight?.target
-      if (
-        currentPhysics?.settled &&
-        currentPhysics.grounded &&
-        target &&
-        Math.abs(currentPhysics.supportHeight - target.y) < 0.16
-      ) {
-        const hard =
-          currentPhysics.hitStrongly && currentPhysics.impactSpeed > 1.2
-        captureLanding()
-        flight = null
-        if (hard) {
-          setState('dizzy reaction')
-          emotions.triggerDizzy()
-        } else {
-          softLanding = {
-            y: root.position.y,
-            joints: rig.joints.map((joint) => joint.quaternion.clone()),
-          }
-          setState('soft landing')
-        }
-      } else if (
-        currentPhysics?.settled &&
-        currentPhysics.grounded &&
-        !target
-      ) {
-        flight = null
-        setState('falling')
-      }
-    } else if (state === 'soft landing') {
-      const p = clamp(age / 0.42, 0, 1)
-      const bend = Math.sin(Math.PI * p)
-      for (const { arm, leg, sign } of sides) {
-        rig.offset(leg.upper, -0.08 * bend, 0, 0)
-        rig.offset(leg.joint, 0.16 * bend, 0, 0)
-        rig.offset(arm.upper, -0.12 * (1 - p), 0, sign * 0.18 * (1 - p))
-      }
-      bodyOffset(-0.045 * body.scale.x * bend)
-      root.position.y = floor
-      if (p >= 1) {
-        softLanding = null
-        landing = null
-        setState('idle')
-      }
     } else if (
       state === 'falling' ||
       state === 'impact' ||
@@ -689,14 +543,13 @@ export function createMovement(robot, physics, emotions, physicsOptions) {
       if (currentPhysics?.impacted && !hit) {
         hit = true
         setState('impact')
+        if (currentPhysics.hitStrongly) emotions.triggerDizzy()
       } else if (state === 'impact' && age > 0.18) setState('settling')
       if (currentPhysics?.settled) {
         const strong = currentPhysics.hitStrongly
         captureLanding()
-        if (strong) {
-          setState('dizzy reaction')
-          emotions.triggerDizzy()
-        }
+        setState('dizzy reaction')
+        if (strong) emotions.triggerDizzy()
         else {
           keepAboveGround(0)
           startRecovery()
@@ -726,15 +579,7 @@ export function createMovement(robot, physics, emotions, physicsOptions) {
     }
     if (
       !reduced &&
-      ![
-        'falling',
-        'impact',
-        'settling',
-        'recovering',
-        'powered flight',
-        'landing approach',
-        'dragging',
-      ].includes(state)
+      !['falling', 'impact', 'settling', 'recovering'].includes(state)
     ) {
       for (const { antenna, sign } of sides)
         rig.offset(
@@ -774,15 +619,6 @@ export function createMovement(robot, physics, emotions, physicsOptions) {
     return true
   }
 
-  function dragTurn(deltaYaw) {
-    if (isLocked()) return false
-    route = 0
-    stopYaw = null
-    yaw = wrap(yaw + deltaYaw)
-    root.quaternion.setFromAxisAngle(yAxis, yaw)
-    return true
-  }
-
   function configure(next) {
     options = { ...options, ...next }
   }
@@ -812,15 +648,8 @@ export function createMovement(robot, physics, emotions, physicsOptions) {
     walk,
     turn,
     faceYaw,
-    dragTurn,
     stop: () => walk(0),
     beginFall,
-    beginPoweredFlight,
-    setFlightTarget,
-    endPoweredFlight,
-    startDrag,
-    dragTo,
-    endDrag,
     startRecovery,
     isLocked,
     configure,
@@ -836,15 +665,11 @@ export function createMovement(robot, physics, emotions, physicsOptions) {
     },
     status: () => ({
       state,
-      grounded:
-        currentPhysics?.grounded ??
-        !airborne && !['powered flight', 'landing approach', 'falling'].includes(state),
+      grounded: currentPhysics?.grounded ?? !airborne,
       physics: currentPhysics ? 'Dynamic' : 'Animation',
       orientation: landing?.orientation ?? null,
       floor,
       time: age,
-      thrust: flight?.landing ? 0.35 : flight ? 1 : 0,
-      dragging,
     }),
   }
 }
