@@ -21,6 +21,8 @@ export function HeroRobot({
       ref={hostRef}
       aria-hidden="true"
       data-hero-robot=""
+      data-robot-surface="hero-platform"
+      data-robot-surface-edge="bottom"
       className="pointer-events-none absolute z-10 select-none"
     />
   )

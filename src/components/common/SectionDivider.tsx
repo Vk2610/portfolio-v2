@@ -7,6 +7,7 @@ export function SectionDivider() {
   return (
     <hr
       ref={ref}
+      data-robot-surface="section-divider"
       className={`border-line ${entered ? 'line-expansion' : ''}`}
     />
   )

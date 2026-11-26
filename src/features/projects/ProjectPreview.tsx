@@ -92,7 +92,10 @@ export function DesktopProjectPreview({
         }
       >
         {project.image && (
-          <div className="project-preview-cover relative isolate aspect-video overflow-hidden">
+          <div
+            data-robot-surface="project-preview"
+            className="project-preview-cover relative isolate aspect-video overflow-hidden"
+          >
             {layers.map((layer) => (
               <CoverLayer
                 key={layer.id}
@@ -141,7 +144,10 @@ export function ProjectPreview({ project }: { project: Project }) {
     <div className="space-y-5">
       {project.image && (
         <figure className="group">
-          <div className="aspect-video w-full">
+          <div
+            data-robot-surface="project-preview-mobile"
+            className="aspect-video w-full"
+          >
             <CoverImage project={project} />
           </div>
           {project.illustrative && (

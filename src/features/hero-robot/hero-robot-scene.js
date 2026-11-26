@@ -21,6 +21,8 @@ import { createMovement } from '@/features/robot-preview/movement.js'
 import { createHeadTracking } from '@/features/robot-preview/head-tracking.js'
 import { computeHeroRobotPlacement } from './hero-robot-placement'
 import { createMagneticRobotCursor } from './magnetic-cursor'
+import { observePortfolioSurfaces } from '@/features/robot-surfaces/surface-observer'
+import { createSurfacePhysicsWorld } from '@/features/robot-surfaces/surface-physics'
 
 function createStudioEnvironment(renderer) {
   const studio = new Scene()
@@ -95,7 +97,9 @@ export function mountHeroRobot(host, container, heading) {
   const bounds = new Box3().setFromObject(robot.root)
   const minY = bounds.min.y
   const modelHeight = Math.max(0.5, bounds.max.y - minY)
+  const viewHeightWorld = modelHeight * 1.35
   const robotHalfWidth = Math.max(0.25, (bounds.max.x - bounds.min.x) / 2)
+  host.dataset.worldHeight = String(viewHeightWorld)
 
   const camera = new OrthographicCamera(-1, 1, 1, -1, 0.1, 40)
   camera.position.set(0, 0, 10)
@@ -466,9 +470,31 @@ export function mountHeroRobot(host, container, heading) {
   syncPlacement()
   startLoop()
 
+  let surfacePhysics = null
+  let latestSurfaces = []
+  void createSurfacePhysicsWorld().then((world) => {
+    if (disposed) {
+      world.dispose()
+      return
+    }
+    surfacePhysics = world
+    if (latestSurfaces.length > 0) {
+      surfacePhysics.sync(latestSurfaces)
+    }
+  })
+  const stopObservingSurfaces = observePortfolioSurfaces({
+    getViewHeightWorld: () => viewHeightWorld,
+    onSurfacesChange: (surfaces) => {
+      latestSurfaces = surfaces
+      surfacePhysics?.sync(surfaces)
+    },
+  })
+
   return () => {
     disposed = true
     stopLoop()
+    stopObservingSurfaces()
+    surfacePhysics?.dispose()
     resizeObserver?.disconnect()
     intersectionObserver?.disconnect()
     window.removeEventListener('pointermove', handlePointerMove)

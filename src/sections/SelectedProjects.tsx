@@ -138,7 +138,11 @@ export function SelectedProjects() {
         {featuredProjects.map((project, index) => {
           const open = expanded === project.id
           return (
-            <article key={project.id} className="border-b border-line-subtle">
+            <article
+              key={project.id}
+              data-robot-surface="project-card"
+              className="border-b border-line-subtle"
+            >
               <h3>
                 <button
                   id={`project-trigger-${project.id}`}
