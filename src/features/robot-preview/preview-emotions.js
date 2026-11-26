@@ -9,6 +9,7 @@ export function bindPreviewEmotions({
   canvas,
   render,
   listen,
+  createMovementControls,
 }) {
   const motion = window.matchMedia('(prefers-reduced-motion: reduce)')
   const stateText = root.querySelector('[data-emotion-state]')
@@ -18,10 +19,12 @@ export function bindPreviewEmotions({
   let timerId = 0
   let lastState
   let lastCount
+  let lastTime = 0
   const controller = createEmotionController({
     now: () => performance.now(),
     onChange: queueRefresh,
   })
+  const movement = createMovementControls(controller, queueRefresh)
 
   function stop() {
     window.cancelAnimationFrame(frameId)
@@ -32,8 +35,14 @@ export function bindPreviewEmotions({
 
   function refresh() {
     stop()
-    if (document.hidden) return
+    if (document.hidden) {
+      lastTime = 0
+      return
+    }
     const time = performance.now()
+    const dt = lastTime ? Math.min(0.25, (time - lastTime) / 1000) : 1 / 60
+    lastTime = time
+    const bodyMoving = movement.frame(time, dt, motion.matches)
     const frame = controller.frame(time, motion.matches)
     if (lastState !== frame.current) {
       lastState = frame.current
@@ -51,7 +60,8 @@ export function bindPreviewEmotions({
     }
     robot.face.update(frame, time, motion.matches)
     render()
-    if (frame.moving) frameId = window.requestAnimationFrame(refresh)
+    if (frame.moving || bodyMoving)
+      frameId = window.requestAnimationFrame(refresh)
     else if (Number.isFinite(frame.next)) {
       timerId = window.setTimeout(refresh, Math.max(0, frame.next - time + 1))
     }
@@ -63,9 +73,14 @@ export function bindPreviewEmotions({
       frameId = window.requestAnimationFrame(refresh)
   }
 
+  const interact = (action) => {
+    if (!movement.movement.isLocked()) action()
+  }
   for (const button of stateButtons) {
     listen(button, 'click', () =>
-      controller.setEmotion(button.dataset.emotion, { override: true }),
+      interact(() =>
+        controller.setEmotion(button.dataset.emotion, { override: true }),
+      ),
     )
   }
   const actions = {
@@ -74,7 +89,9 @@ export function bindPreviewEmotions({
     reset: controller.resetEmotion,
   }
   for (const button of root.querySelectorAll('[data-emotion-action]')) {
-    listen(button, 'click', actions[button.dataset.emotionAction])
+    listen(button, 'click', () =>
+      interact(actions[button.dataset.emotionAction]),
+    )
   }
   for (const input of root.querySelectorAll('[data-emotion-setting]')) {
     listen(input, 'change', () => {
@@ -131,7 +148,11 @@ export function bindPreviewEmotions({
       if (tap?.id !== event.pointerId) return
       const valid = !moved(event) && hitsRobot(event)
       tap = null
-      if (valid) controller.registerInteraction()
+      if (valid)
+        interact(() => {
+          movement.onTouch(event)
+          controller.registerInteraction()
+        })
     },
     true,
   )
@@ -144,5 +165,20 @@ export function bindPreviewEmotions({
   listen(motion, 'change', refresh)
   listen(document, 'visibilitychange', refresh)
   refresh()
-  return stop
+  return {
+    movement,
+    reset() {
+      movement.reset()
+      for (const input of root.querySelectorAll('[data-emotion-setting]')) {
+        input.value = input.defaultValue
+        controller.configure({
+          [input.dataset.emotionSetting]: Number(input.defaultValue),
+        })
+      }
+    },
+    dispose() {
+      stop()
+      movement.dispose()
+    },
+  }
 }

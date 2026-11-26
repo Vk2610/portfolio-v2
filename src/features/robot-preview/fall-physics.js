@@ -2,23 +2,38 @@ import RAPIER from '@dimforge/rapier3d-compat'
 import { Matrix4, Quaternion, Vector3 } from 'three'
 
 const fixedStep = 1 / 120
-export const physicsDefaults = { gravity: 9.81, friction: 0.75, restitution: 0.20, mass: 6, damping: 0.68, dropHeight: 1.25 }
+export const physicsDefaults = {
+  gravity: 9.81,
+  friction: 0.75,
+  restitution: 0.2,
+  mass: 6,
+  damping: 0.68,
+  dropHeight: 1.25,
+}
 
 let ready
 export const preparePhysics = () => (ready ??= RAPIER.init({}))
 
 const weights = {
   'Pearlescent helmet': 5.1,
+  'Wraparound smoked visor': 0.16,
   'Rounded chest shell': 2.4,
   'Upper joint': 0.23,
   'Pearlescent arm guard': 0.32,
   'Mitten hand': 0.16,
   'Hip joint': 0.35,
   'Boot shell': 0.43,
+  'Thin outsole': 0.045,
   'Ear shell': 0.11,
   'Antenna light': 0.015,
   'Antenna stem': 0.018,
 }
+const fitted = new Set([
+  'Pearlescent helmet',
+  'Wraparound smoked visor',
+  'Boot shell',
+  'Thin outsole',
+])
 
 export function createFallPhysics(rig, initial = physicsDefaults) {
   let options = { ...initial }
@@ -39,11 +54,32 @@ export function createFallPhysics(rig, initial = physicsDefaults) {
   let grounded = false
   let supportHeight = 0
 
-  const parts = rig.hitMeshes.filter((part) => weights[part.name]).map((part) => {
-    part.geometry.computeBoundingBox()
-    const box = part.geometry.boundingBox
-    return { part, center: box.getCenter(new Vector3()), half: box.getSize(new Vector3()).multiplyScalar(0.5), mass: weights[part.name] }
-  })
+  const parts = rig.hitMeshes
+    .filter((part) => weights[part.name])
+    .map((part) => {
+      part.geometry.computeBoundingBox()
+      const box = part.geometry.boundingBox
+      const center = box.getCenter(new Vector3())
+      const samples = []
+      if (fitted.has(part.name)) {
+        const vertices = part.geometry.getAttribute('position')
+        const stride = Math.max(1, Math.floor(vertices.count / 245))
+        for (let i = 0; i < vertices.count; i += stride) {
+          samples.push(
+            vertices.getX(i) - center.x,
+            vertices.getY(i) - center.y,
+            vertices.getZ(i) - center.z,
+          )
+        }
+      }
+      return {
+        part,
+        center,
+        half: box.getSize(new Vector3()).multiplyScalar(0.5),
+        mass: weights[part.name],
+        samples,
+      }
+    })
   const total = parts.reduce((sum, part) => sum + part.mass, 0)
   const priorPosition = new Vector3()
   const priorRotation = new Quaternion()
@@ -62,9 +98,12 @@ export function createFallPhysics(rig, initial = physicsDefaults) {
     platforms = next.map((surface) => ({ ...surface }))
     surfaces = [ground, ...platforms].map((surface) => ({
       ...surface,
-      collider: world.createCollider(RAPIER.ColliderDesc.cuboid(surface.width / 2, 0.12, surface.depth / 2)
-        .setTranslation(surface.x, surface.height - 0.12, surface.z)
-        .setFriction(options.friction).setRestitution(options.restitution)),
+      collider: world.createCollider(
+        RAPIER.ColliderDesc.cuboid(surface.width / 2, 0.12, surface.depth / 2)
+          .setTranslation(surface.x, surface.height - 0.12, surface.z)
+          .setFriction(options.friction)
+          .setRestitution(options.restitution),
+      ),
     }))
   }
 
@@ -73,8 +112,12 @@ export function createFallPhysics(rig, initial = physicsDefaults) {
   function floorAt(x, z, below = Infinity) {
     let height = 0
     for (const surface of platforms) {
-      if (surface.height <= below && Math.abs(x - surface.x) <= surface.width / 2 &&
-        Math.abs(z - surface.z) <= surface.depth / 2) height = Math.max(height, surface.height)
+      if (
+        surface.height <= below &&
+        Math.abs(x - surface.x) <= surface.width / 2 &&
+        Math.abs(z - surface.z) <= surface.depth / 2
+      )
+        height = Math.max(height, surface.height)
     }
     return height
   }
@@ -100,21 +143,58 @@ export function createFallPhysics(rig, initial = physicsDefaults) {
       for (const old of colliders) world.removeCollider(old, false)
       colliders = []
     }
-    for (const [index, { part, center, half, mass }] of parts.entries()) {
-      localMatrix.multiplyMatrices(inverse, part.matrixWorld).decompose(localPos, localRotation, localScale)
-      localPos.add(offset.copy(center).multiply(localScale).applyQuaternion(localRotation)).multiplyScalar(overall)
+    for (const [
+      index,
+      { part, center, half, mass, samples },
+    ] of parts.entries()) {
+      localMatrix
+        .multiplyMatrices(inverse, part.matrixWorld)
+        .decompose(localPos, localRotation, localScale)
+      localPos
+        .add(
+          offset
+            .copy(center)
+            .multiply(localScale)
+            .applyQuaternion(localRotation),
+        )
+        .multiplyScalar(overall)
       if (rebuild) {
         offset.copy(half).multiply(localScale).multiplyScalar(overall)
-        const radius = 0.70 * Math.min(offset.x, offset.y, offset.z)
+        const radius = 0.7 * Math.min(offset.x, offset.y, offset.z)
         // Round the simplified shells so contacts can roll across the head and limbs.
-        const collider = world.createCollider(RAPIER.ColliderDesc.roundCuboid(
-          Math.max(0.001, offset.x * 0.95 - radius),
-          Math.max(0.001, offset.y * 0.95 - radius),
-          Math.max(0.001, offset.z * 0.95 - radius),
-          radius,
-        ).setTranslation(localPos.x, localPos.y, localPos.z).setRotation(localRotation)
-          .setMass(options.mass * mass / total)
-          .setFriction(options.friction).setRestitution(options.restitution), dynamic)
+        const hull = samples.length
+          ? RAPIER.ColliderDesc.roundConvexHull(
+              Float32Array.from(
+                samples,
+                (value, i) =>
+                  value *
+                  (i % 3 === 0
+                    ? localScale.x
+                    : i % 3 === 1
+                      ? localScale.y
+                      : localScale.z) *
+                  overall,
+              ),
+              0.016 * overall,
+            )
+          : null
+        const proxy =
+          hull ??
+          RAPIER.ColliderDesc.roundCuboid(
+            Math.max(0.001, offset.x * 0.95 - radius),
+            Math.max(0.001, offset.y * 0.95 - radius),
+            Math.max(0.001, offset.z * 0.95 - radius),
+            radius,
+          )
+        const collider = world.createCollider(
+          proxy
+            .setTranslation(localPos.x, localPos.y, localPos.z)
+            .setRotation(localRotation)
+            .setMass((options.mass * mass) / total)
+            .setFriction(options.friction)
+            .setRestitution(options.restitution),
+          dynamic,
+        )
         colliders.push(collider)
       } else {
         colliders[index].setTranslationWrtParent(localPos)
@@ -126,14 +206,16 @@ export function createFallPhysics(rig, initial = physicsDefaults) {
   function start({ velocity, roll }) {
     clear()
     const { position, quaternion } = rig.root
-    dynamic = world.createRigidBody(RAPIER.RigidBodyDesc.dynamic()
-      .setTranslation(position.x, position.y, position.z)
-      .setRotation(quaternion)
-      .setLinvel(velocity.x, velocity.y, velocity.z)
-      .setAngvel(roll)
-      .setLinearDamping(options.damping * 0.45)
-      .setAngularDamping(options.damping)
-      .setCcdEnabled(true))
+    dynamic = world.createRigidBody(
+      RAPIER.RigidBodyDesc.dynamic()
+        .setTranslation(position.x, position.y, position.z)
+        .setRotation(quaternion)
+        .setLinvel(velocity.x, velocity.y, velocity.z)
+        .setAngvel(roll)
+        .setLinearDamping(options.damping * 0.45)
+        .setAngularDamping(options.damping)
+        .setCcdEnabled(true),
+    )
     priorPosition.copy(position)
     priorRotation.copy(quaternion)
     currentPosition.copy(position)
@@ -164,22 +246,35 @@ export function createFallPhysics(rig, initial = physicsDefaults) {
             if (!contact.numSolverContacts()) return
             grounded = true
             supportHeight = surface.height
-            if (!impacted && elapsed > 0.10 &&
-              (speedBefore > 1.0 || Math.abs(upY) < 0.76 || rotationBefore > 2.2)) {
+            if (
+              !impacted &&
+              elapsed > 0.1 &&
+              (speedBefore > 1.0 ||
+                Math.abs(upY) < 0.76 ||
+                rotationBefore > 2.2)
+            ) {
               impacted = true
-              hitStrongly = speedBefore > 0.95 || rotationBefore > 1.25 || upY < 0.62
+              hitStrongly =
+                speedBefore > 0.95 || rotationBefore > 1.25 || upY < 0.62
             }
           })
         }
       }
-      const slow = direction.copy(dynamic.linvel()).length() < 0.27 &&
+      const slow =
+        direction.copy(dynamic.linvel()).length() < 0.27 &&
         direction.copy(dynamic.angvel()).length() < 0.43
       stableFor = grounded && slow ? stableFor + fixedStep : 0
     }
     const alpha = accumulator / fixedStep
-    const settled = (elapsed > 0.35 && stableFor >= 0.32) || (grounded && dynamic.isSleeping())
-    rig.root.position.copy(settled ? currentPosition : priorPosition).lerp(currentPosition, settled ? 1 : alpha)
-    rig.root.quaternion.copy(settled ? currentRotation : priorRotation).slerp(currentRotation, settled ? 1 : alpha)
+    const settled =
+      (elapsed > 0.35 && stableFor >= 0.32) ||
+      (grounded && dynamic.isSleeping())
+    rig.root.position
+      .copy(settled ? currentPosition : priorPosition)
+      .lerp(currentPosition, settled ? 1 : alpha)
+    rig.root.quaternion
+      .copy(settled ? currentRotation : priorRotation)
+      .slerp(currentRotation, settled ? 1 : alpha)
     return { grounded, impacted, hitStrongly, settled, supportHeight, elapsed }
   }
 
@@ -197,7 +292,13 @@ export function createFallPhysics(rig, initial = physicsDefaults) {
     }
   }
 
-  return { start, clear, advance, configure, updateSurfaces, floorAt,
+  return {
+    start,
+    clear,
+    advance,
+    configure,
+    updateSurfaces,
+    floorAt,
     rebuild: () => updateParts(true),
     debug: () => world.debugRender(),
     dispose: () => world.free(),

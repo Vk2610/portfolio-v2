@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { mountPreview } from './preview.js'
+import { MovementControls } from './MovementControls'
 import './robot-preview.css'
 
 export default function RobotPreview() {
@@ -89,6 +90,7 @@ export default function RobotPreview() {
             ))}
           </details>
         </fieldset>
+        <MovementControls />
         <fieldset className="controls">
           <legend>Camera view</legend>
           <div className="presets">

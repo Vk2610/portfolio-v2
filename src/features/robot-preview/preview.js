@@ -6,6 +6,7 @@ import {
   HemisphereLight,
   Mesh,
   MeshBasicMaterial,
+  MeshStandardMaterial,
   OrthographicCamera,
   PlaneGeometry,
   PMREMGenerator,
@@ -17,6 +18,8 @@ import {
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { createRobot, defaultScales } from './robot.js'
 import { bindPreviewEmotions } from './preview-emotions.js'
+import { bindPreviewMovement } from './preview-movement.js'
+import { preparePhysics } from './fall-physics.js'
 
 const presets = {
   front: [0, 0.025],
@@ -126,6 +129,18 @@ function showPreview(root) {
 
   const robot = createRobot()
   scene.add(robot.root)
+  const ground = new Mesh(
+    new PlaneGeometry(18, 12),
+    new MeshStandardMaterial({
+      color: '#151924',
+      roughness: 0.95,
+      transparent: true,
+      opacity: 0.21,
+    }),
+  )
+  ground.rotation.x = -Math.PI / 2
+  ground.position.y = -0.036
+  scene.add(ground)
   const shadow = contactShadow(0, -0.05, 3.25, 2.3, 0.62)
   const feetShadows = [-1, 1].map((side) =>
     contactShadow(side * 0.27, 0.04, 0.85, 0.9, 0.77),
@@ -148,8 +163,62 @@ function showPreview(root) {
   const angleReadout = root.querySelector('#turntable-angle')
   let modelHeight = 3.8
   let headWorldScale = 1
+  let restingCameraY = modelHeight / 2
+  let controls
+  let appliedScales = { ...defaultScales }
+  const footLocations = ['Left foot', 'Right foot'].map((name) =>
+    robot.root.getObjectByName(name),
+  )
+  const footPosition = new Vector3()
+  const lookCenter = new Vector3()
+  const cameraRight = new Vector3()
 
   function render() {
+    const floor = controls?.movement.movement.status().floor ?? 0
+    shadow.position.set(
+      robot.root.position.x,
+      floor - 0.022 + (floor > 0 ? 0.033 : 0),
+      robot.root.position.z - 0.05,
+    )
+    shadow.material.uniforms.opacity.value =
+      0.62 / (1 + 1.4 * Math.max(0, robot.root.position.y - floor))
+    for (let index = 0; index < feetShadows.length; index++) {
+      footLocations[index].getWorldPosition(footPosition)
+      const shoeShadow = feetShadows[index]
+      shoeShadow.position.set(
+        footPosition.x,
+        shadow.position.y + 0.002,
+        footPosition.z + 0.04,
+      )
+      shoeShadow.material.uniforms.opacity.value =
+        0.68 / (1 + 9 * Math.max(0, footPosition.y - floor - 0.22))
+    }
+    // Reframe only near the edge so walking still reads as travel.
+    if (!gestureStart && selectedView !== 'close') {
+      const width = camera.right / camera.zoom
+      const right = cameraRight.set(1, 0, 0).applyQuaternion(camera.quaternion)
+      const localX = lookCenter
+        .copy(robot.root.position)
+        .sub(orbit.target)
+        .dot(right)
+      const room = Math.max(0.32, width - 1.42 * headWorldScale)
+      if (Math.abs(localX) > room + 0.008) {
+        const shift = localX - Math.sign(localX) * room
+        orbit.target.addScaledVector(right, shift * 0.22)
+        camera.position.addScaledVector(right, shift * 0.22)
+      }
+      const verticalRoom = Math.max(
+        0,
+        camera.top / camera.zoom - modelHeight / 2 - 0.24,
+      )
+      const desiredY =
+        restingCameraY + Math.max(0, robot.root.position.y - verticalRoom)
+      const shiftY = (desiredY - orbit.target.y) * 0.18
+      if (Math.abs(shiftY) > 0.001) {
+        orbit.target.y += shiftY
+        camera.position.y += shiftY
+      }
+    }
     zoomLevel.value = `${Math.round(camera.zoom * 100)}%`
     zoomIn.disabled = camera.zoom >= orbit.maxZoom
     zoomOut.disabled = camera.zoom <= orbit.minZoom
@@ -254,7 +323,11 @@ function showPreview(root) {
       scales[key] = percentage / 100
       output.value = `${percentage}%`
     }
-    robot.setScales(scales)
+    if (Object.keys(scales).some((key) => scales[key] !== appliedScales[key])) {
+      appliedScales = scales
+      robot.setScales(scales)
+      controls?.movement.movement.proportionsChanged()
+    }
     headWorldScale = scales.head * scales.overall
     const groundScale = (scales.overall * scales.body) / defaultScales.body
     shadow.scale.setScalar(groundScale)
@@ -263,12 +336,12 @@ function showPreview(root) {
       foot.position.x = (index === 0 ? -1 : 1) * 0.27 * groundScale
     }
     modelHeight =
-      (robot.root.getObjectByName('Neck pivot').position.y +
-        2.22 * scales.head) *
+      (scales.body * 2.63 - 0.018 * scales.head + 2.22 * scales.head) *
       scales.overall
     const nextTarget =
       modelHeight / 2 +
       (selectedView === 'close' ? 0.91 * scales.head * scales.overall : 0)
+    restingCameraY = nextTarget
     camera.position.y += nextTarget - orbit.target.y
     orbit.target.y = nextTarget
     resize()
@@ -279,9 +352,11 @@ function showPreview(root) {
   for (const { input } of fields) listen(input, 'input', updateScales)
 
   function reset() {
+    controls?.reset()
     for (const { key, input } of fields)
       input.value = String(defaultScales[key] * 100)
     camera.zoom = 1
+    orbit.target.x = orbit.target.z = 0
     camera.updateProjectionMatrix()
     selectView('three-quarter')
     updateScales()
@@ -310,16 +385,27 @@ function showPreview(root) {
   const observer = new ResizeObserver(resize)
   observer.observe(stage)
   reset()
-  const stopEmotions = bindPreviewEmotions({
+  controls = bindPreviewEmotions({
     root,
     robot,
     camera,
     canvas: renderer.domElement,
     render,
     listen,
+    createMovementControls: (emotions, queueRefresh) =>
+      bindPreviewMovement({
+        root,
+        robot,
+        scene,
+        camera,
+        canvas: renderer.domElement,
+        listen,
+        emotions,
+        queueRefresh,
+      }),
   })
   return () => {
-    stopEmotions()
+    controls.dispose()
     listeners.abort()
     observer.disconnect()
     orbit.dispose()
@@ -343,13 +429,24 @@ function showPreview(root) {
 
 export function mountPreview(root) {
   const status = root.querySelector('#render-status')
-  status.hidden = true
-  try {
-    return showPreview(root)
-  } catch (error) {
-    status.hidden = false
-    status.textContent =
-      'The character preview could not start. A WebGL 2 browser is required.'
-    window.console.error(error)
+  let mounted = true
+  let cleanup
+  status.hidden = false
+  status.textContent = 'Loading the robot preview…'
+  preparePhysics()
+    .then(() => {
+      if (!mounted) return
+      cleanup = showPreview(root)
+      status.hidden = true
+    })
+    .catch((error) => {
+      if (!mounted) return
+      status.textContent =
+        'The character preview could not start. WebGL 2 and WebAssembly are required.'
+      window.console.error(error)
+    })
+  return () => {
+    mounted = false
+    cleanup?.()
   }
 }
