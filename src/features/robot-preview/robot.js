@@ -12,6 +12,7 @@ import {
   Vector2,
 } from 'three'
 import { contour, loft, sampleProfile, surface } from './geometry.js'
+import { createFace } from './face.js'
 
 export const defaultScales = { head: 1, body: 0.6, overall: 1 }
 
@@ -163,7 +164,8 @@ function makeEye(parent, x, light) {
   const core = surface(10, 56, (t, a) =>
     ellipse(Math.max(0.0001, 1 - t), a, false),
   )
-  mesh(parent, 'Cyan eye', core, light).renderOrder = 2
+  const eye = mesh(parent, 'Cyan eye', core, light)
+  eye.renderOrder = 2
   const halo = surface(14, 64, (t, a) =>
     ellipse(Math.max(0.0001, 1 - t), a, true),
   )
@@ -196,7 +198,9 @@ function makeEye(parent, x, light) {
       }
     `,
   })
-  mesh(parent, 'Eye light falloff', halo, haloMaterial).renderOrder = 1
+  const glow = mesh(parent, 'Eye light falloff', halo, haloMaterial)
+  glow.renderOrder = 1
+  return [eye, glow]
 }
 
 function makeHead(head, materials) {
@@ -237,8 +241,9 @@ function makeHead(head, materials) {
     ),
     glass,
   )
+  const approvedEyes = []
   for (const side of [-1, 1]) {
-    makeEye(casing, side * 0.468, eye)
+    approvedEyes.push(...makeEye(casing, side * 0.468, eye))
     const ear = pivot(
       casing,
       side < 0 ? 'Left ear' : 'Right ear',
@@ -351,6 +356,7 @@ function makeHead(head, materials) {
       antennaLight,
     )
   }
+  return { casing, approvedEyes }
 }
 
 function sculpt(parent, name, profile, finish) {
@@ -426,7 +432,8 @@ function makeBody(body, { shell, dark }) {
       ],
       dark,
     )
-    const arm = pivot(shoulder, name + ' arm', 0, -0.23)
+    const elbow = pivot(shoulder, name + ' elbow', 0, -0.42)
+    const arm = pivot(elbow, name + ' arm', 0, 0.19)
     sculpt(
       arm,
       'Pearlescent arm guard',
@@ -470,9 +477,11 @@ function makeBody(body, { shell, dark }) {
       ],
       dark,
     )
-    const ankle = pivot(hip, name + ' ankle', 0, -0.545)
+    const knee = pivot(hip, name + ' knee', 0, -0.31)
+    const ankle = pivot(knee, name + ' ankle', 0, -0.235)
+    const foot = pivot(ankle, name + ' foot')
     sculpt(
-      ankle,
+      foot,
       'Boot shell',
       [
         [-0.353, 0.255, 0.352, -0.078, 0.83],
@@ -486,7 +495,7 @@ function makeBody(body, { shell, dark }) {
       shell,
     )
     sculpt(
-      ankle,
+      foot,
       'Thin outsole',
       [
         [-0.385, 0.235, 0.325, -0.077, 0.85],
@@ -503,7 +512,9 @@ export function createRobot() {
   const root = new Group()
   root.name = 'H1 Classic'
   const body = pivot(root, 'Body scale')
-  const head = pivot(root, 'Neck pivot')
+  const neck = pivot(root, 'Neck pivot')
+  const head = pivot(neck, 'Head pose')
+  const look = pivot(head, 'Head tracking')
   const materials = {
     shell: material('#f5f5f7', 0.36, 0.07, 0.34, { envMapIntensity: 0.43 }),
     secondaryShell: material('#d1d5db', 0.32, 0.11, 0.32),
@@ -522,17 +533,22 @@ export function createRobot() {
     }),
     eye: new MeshBasicMaterial({ color: '#77f4ff', toneMapped: false }),
   }
-  makeHead(head, materials)
+  const { casing, approvedEyes } = makeHead(look, materials)
   makeBody(body, materials)
+  const hitMeshes = []
+  root.traverse((object) => {
+    if (object.isMesh && !approvedEyes.includes(object)) hitMeshes.push(object)
+  })
+  const face = createFace(casing, approvedEyes, glassDepth)
 
   function setScales({ head: headScale, body: bodyScale, overall }) {
     body.scale.setScalar(bodyScale)
-    head.scale.setScalar(headScale)
-    head.position.y = bodyScale * 2.63 - 0.018 * headScale
+    neck.scale.setScalar(headScale)
+    neck.position.y = bodyScale * 2.63 - 0.018 * headScale
     root.scale.setScalar(overall)
     root.updateMatrixWorld(true)
   }
 
   setScales(defaultScales)
-  return { root, setScales }
+  return { root, body, neck, head, look, setScales, face, hitMeshes }
 }

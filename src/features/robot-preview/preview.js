@@ -16,6 +16,7 @@ import {
 } from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { createRobot, defaultScales } from './robot.js'
+import { bindPreviewEmotions } from './preview-emotions.js'
 
 const presets = {
   front: [0, 0.025],
@@ -97,8 +98,11 @@ function showPreview(root) {
   const viewButtons = [...root.querySelectorAll('[data-view]')]
 
   const listeners = new AbortController()
-  const listen = (element, type, action) =>
-    element.addEventListener(type, action, { signal: listeners.signal })
+  const listen = (element, type, action, capture = false) =>
+    element.addEventListener(type, action, {
+      signal: listeners.signal,
+      capture,
+    })
 
   const renderer = new WebGLRenderer({ antialias: true, alpha: true })
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
@@ -143,6 +147,7 @@ function showPreview(root) {
   const turntable = root.querySelector('#turntable')
   const angleReadout = root.querySelector('#turntable-angle')
   let modelHeight = 3.8
+  let headWorldScale = 1
 
   function render() {
     zoomLevel.value = `${Math.round(camera.zoom * 100)}%`
@@ -250,6 +255,7 @@ function showPreview(root) {
       output.value = `${percentage}%`
     }
     robot.setScales(scales)
+    headWorldScale = scales.head * scales.overall
     const groundScale = (scales.overall * scales.body) / defaultScales.body
     shadow.scale.setScalar(groundScale)
     for (const [index, foot] of feetShadows.entries()) {
@@ -287,7 +293,12 @@ function showPreview(root) {
     const { clientWidth: width, clientHeight: height } = stage
     if (!width || !height) return
     const aspect = width / height
-    const span = Math.max(2.38, modelHeight * 0.56, 1.64 / aspect)
+    // Reserve room above the antenna tips so dizziness never jumps the camera.
+    const span = Math.max(
+      2.72,
+      modelHeight / 2 + 0.79 * headWorldScale,
+      1.64 / aspect,
+    )
     camera.left = -span * aspect
     camera.right = span * aspect
     camera.top = span
@@ -299,16 +310,30 @@ function showPreview(root) {
   const observer = new ResizeObserver(resize)
   observer.observe(stage)
   reset()
+  const stopEmotions = bindPreviewEmotions({
+    root,
+    robot,
+    camera,
+    canvas: renderer.domElement,
+    render,
+    listen,
+  })
   return () => {
+    stopEmotions()
     listeners.abort()
     observer.disconnect()
     orbit.dispose()
     const materials = new Set()
+    const geometries = new Set()
     scene.traverse((object) => {
-      object.geometry?.dispose()
+      if (object.geometry && !object.isSprite) geometries.add(object.geometry)
       if (object.material) materials.add(object.material)
     })
-    for (const material of materials) material.dispose()
+    for (const geometry of geometries) geometry.dispose()
+    for (const material of materials) {
+      material.map?.dispose()
+      material.dispose()
+    }
     lighting.dispose()
     renderer.dispose()
     renderer.forceContextLoss()

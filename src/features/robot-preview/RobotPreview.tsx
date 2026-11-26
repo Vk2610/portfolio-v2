@@ -25,6 +25,71 @@ export default function RobotPreview() {
           <h1>H1 Classic</h1>
         </header>
         <fieldset className="controls">
+          <legend>Emotions</legend>
+          <p>Tap the robot to interact, or try a reaction below.</p>
+          <div className="presets">
+            <button type="button" data-emotion="neutral">
+              Neutral
+            </button>
+            <button type="button" data-emotion="happy">
+              Happy
+            </button>
+            <button type="button" data-emotion="dizzy">
+              Dizzy
+            </button>
+            <button type="button" data-emotion="angry">
+              Angry
+            </button>
+            <button type="button" data-emotion-action="tap">
+              Simulate tap
+            </button>
+            <button type="button" data-emotion-action="impact">
+              Simulate impact
+            </button>
+          </div>
+          <button type="button" data-emotion-action="reset">
+            Reset emotion
+          </button>
+          <p className="emotion-status">
+            <span>
+              Emotion <output data-emotion-state>Neutral</output>
+            </span>
+            <span>
+              Taps <output data-emotion-count>0</output>
+            </span>
+          </p>
+          <details className="emotion-timing">
+            <summary>Timing settings</summary>
+            {[
+              [
+                'interactionWindow',
+                'Interaction window (ms)',
+                5000,
+                1000,
+                20000,
+                100,
+              ],
+              ['happy', 'Happy duration (ms)', 2000, 500, 10000, 100],
+              ['dizzy', 'Dizzy duration (ms)', 3000, 500, 10000, 100],
+              ['angry', 'Angry duration (ms)', 3000, 500, 10000, 100],
+              ['transition', 'Transition duration (ms)', 275, 100, 600, 25],
+            ].map(([key, label, value, min, max, step]) => (
+              <label className="emotion-setting" key={key}>
+                {label}
+                <input
+                  type="number"
+                  data-emotion-setting={key}
+                  defaultValue={value}
+                  min={min}
+                  max={max}
+                  step={step}
+                  required
+                />
+              </label>
+            ))}
+          </details>
+        </fieldset>
+        <fieldset className="controls">
           <legend>Camera view</legend>
           <div className="presets">
             <button type="button" data-view="front">
