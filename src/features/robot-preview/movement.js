@@ -619,6 +619,15 @@ export function createMovement(robot, physics, emotions, physicsOptions) {
     return true
   }
 
+  function rotateBy(deltaYaw) {
+    if (isLocked()) return false
+    route = 0
+    stopYaw = null
+    yaw = wrap(yaw + deltaYaw)
+    root.quaternion.setFromAxisAngle(yAxis, yaw)
+    return true
+  }
+
   function configure(next) {
     options = { ...options, ...next }
   }
@@ -648,6 +657,7 @@ export function createMovement(robot, physics, emotions, physicsOptions) {
     walk,
     turn,
     faceYaw,
+    rotateBy,
     stop: () => walk(0),
     beginFall,
     startRecovery,

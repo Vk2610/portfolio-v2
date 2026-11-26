@@ -1,4 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
+import { Euler, Quaternion } from 'three'
+import { createRobot } from '@/features/robot-preview/robot.js'
+import { createEmotionController } from '@/features/robot-preview/emotions.js'
+import { physicsDefaults } from '@/features/robot-preview/fall-physics.js'
+import { createMovement } from '@/features/robot-preview/movement.js'
 import { computeHeroRobotPlacement } from '@/features/hero-robot/hero-robot-placement'
 import {
   createMagneticRobotCursor,
@@ -132,5 +137,36 @@ describe('hero robot placement', () => {
 
     cursor.destroy()
     expect(document.querySelector('[data-robot-magnetic-cursor]')).toBeNull()
+  })
+
+  it('rotates 360 degrees around Y-axis via rotateBy while locking position', () => {
+    const robot = createRobot()
+    const physics = {
+      floorAt: () => 0,
+      updateSurfaces: () => {},
+      dispose: () => {},
+    }
+    const emotions = createEmotionController({ now: () => 0 })
+    const movement = createMovement(robot, physics, emotions, physicsDefaults)
+
+    const initialPos = robot.root.position.toArray()
+    movement.rotateBy(Math.PI / 2)
+    movement.update(16, 0.016, false)
+
+    const euler = new Euler().setFromQuaternion(
+      robot.root.quaternion as Quaternion,
+      'YXZ',
+    )
+    expect(euler.y).toBeCloseTo(Math.PI / 2, 2)
+    expect(robot.root.position.toArray()).toEqual(initialPos)
+
+    movement.rotateBy(Math.PI)
+    movement.update(32, 0.016, false)
+    const euler2 = new Euler().setFromQuaternion(
+      robot.root.quaternion as Quaternion,
+      'YXZ',
+    )
+    expect(Math.abs(euler2.y)).toBeCloseTo(Math.PI / 2, 2)
+    expect(robot.root.position.toArray()).toEqual(initialPos)
   })
 })

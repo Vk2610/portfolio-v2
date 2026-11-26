@@ -195,6 +195,7 @@ export function mountHeroRobot(host, container, heading) {
     if (!reduced) {
       const statusBefore = movement.status()
       const canAdvanceCycle =
+        !tap?.rotating &&
         emotionFrame.current === 'neutral' &&
         !movement.isLocked() &&
         statusBefore.grounded
@@ -233,6 +234,8 @@ export function mountHeroRobot(host, container, heading) {
             movement.faceYaw(0)
           }
         }
+      } else if (tap?.rotating) {
+        movement.stop()
       } else {
         movement.stop()
         movement.faceYaw(0)
@@ -241,13 +244,17 @@ export function mountHeroRobot(host, container, heading) {
 
     movement.update(timeMs, dt, reduced)
     const status = movement.status()
-    tracking.step(timeMs, dt, status.state, emotionFrame.current, reduced)
+    if (!tap?.rotating) {
+      tracking.step(timeMs, dt, status.state, emotionFrame.current, reduced)
+    }
     robot.root.position.x = Math.max(
       -limitX,
       Math.min(limitX, robot.root.position.x),
     )
     robot.root.updateMatrixWorld(true)
-    if (hasPointer && !reduced) {
+    if (tap?.rotating && tap.pointerType !== 'touch' && !reduced) {
+      magneticCursor.setHover(true)
+    } else if (hasPointer && !reduced) {
       magneticCursor.setHover(hitRobot(lastPointerX, lastPointerY))
     } else {
       magneticCursor.setHover(false)
@@ -302,6 +309,29 @@ export function mountHeroRobot(host, container, heading) {
   intersectionObserver?.observe(container)
 
   const handlePointerMove = (event) => {
+    if (tap && tap.id === event.pointerId) {
+      const moved = Math.hypot(event.clientX - tap.x, event.clientY - tap.y)
+      if (!tap.rotating && moved > 5) {
+        tap.rotating = true
+        tap.lastX = event.clientX
+        movement.stop()
+        tracking.clear()
+      }
+      if (tap.rotating) {
+        if (event.cancelable) event.preventDefault()
+        const dx = event.clientX - tap.lastX
+        tap.lastX = event.clientX
+        movement.rotateBy(dx * 0.012)
+        if (tap.pointerType !== 'touch') {
+          hasPointer = true
+          lastPointerX = event.clientX
+          lastPointerY = event.clientY
+        }
+        magneticCursor.setPointer(event.clientX, event.clientY)
+        startLoop()
+        return
+      }
+    }
     if (event.pointerType === 'touch') return
     hasPointer = true
     lastPointerX = event.clientX
@@ -319,12 +349,18 @@ export function mountHeroRobot(host, container, heading) {
       tap = null
       return
     }
-    if (hitRobot(event.clientX, event.clientY)) {
+    if (
+      !movement.isLocked() &&
+      movement.status().grounded &&
+      hitRobot(event.clientX, event.clientY)
+    ) {
       tap = {
         id: event.pointerId,
         x: event.clientX,
         y: event.clientY,
+        lastX: event.clientX,
         pointerType: event.pointerType,
+        rotating: false,
       }
       if (event.pointerType === 'touch') {
         magneticCursor.touchPress(event.clientX, event.clientY)
@@ -340,16 +376,21 @@ export function mountHeroRobot(host, container, heading) {
       tap = null
     }
   }
-  const handlePointerUp = (event) => {
+  const finishPointerInteraction = (event, cancelled = false) => {
     if (!tap || tap.id !== event.pointerId) return
+    const wasRotating = tap.rotating
+    const pointerType = tap.pointerType
     const withinTapThreshold =
-      Math.hypot(event.clientX - tap.x, event.clientY - tap.y) <= 8
+      !cancelled &&
+      !wasRotating &&
+      Math.hypot(event.clientX - tap.x, event.clientY - tap.y) <= 5
+    tap = null
 
-    if (tap.pointerType === 'touch') {
+    if (pointerType === 'touch') {
       magneticCursor.touchRelease()
     } else {
       magneticCursor.setPointer(event.clientX, event.clientY)
-      if (hitRobot(event.clientX, event.clientY)) {
+      if (!cancelled && hitRobot(event.clientX, event.clientY)) {
         magneticCursor.releaseBurst()
       } else {
         magneticCursor.setPressed(false)
@@ -357,21 +398,25 @@ export function mountHeroRobot(host, container, heading) {
       }
     }
 
+    if (wasRotating) {
+      cyclePhase = 'idle'
+      phaseRemaining = 5
+      movement.stop()
+      movement.faceYaw(0)
+      startLoop()
+      return
+    }
+
     if (withinTapThreshold && !motionQuery?.matches && !movement.isLocked()) {
-      if (event.pointerType === 'touch') {
+      if (pointerType === 'touch') {
         tracking.point(event.clientX, event.clientY, performance.now(), true)
       }
       emotions.registerInteraction()
       startLoop()
     }
-    tap = null
   }
-  const handlePointerCancel = () => {
-    tap = null
-    magneticCursor.setPressed(false)
-    magneticCursor.setHover(false)
-    magneticCursor.touchRelease()
-  }
+  const handlePointerUp = (event) => finishPointerInteraction(event, false)
+  const handlePointerCancel = (event) => finishPointerInteraction(event, true)
   const handlePointerLeave = (event) => {
     if (event.pointerType !== 'touch') {
       hasPointer = false
@@ -400,7 +445,7 @@ export function mountHeroRobot(host, container, heading) {
     startLoop()
   }
 
-  window.addEventListener('pointermove', handlePointerMove, { passive: true })
+  window.addEventListener('pointermove', handlePointerMove, { passive: false })
   window.addEventListener('pointerdown', handlePointerDown, { passive: true })
   window.addEventListener('pointerup', handlePointerUp, { passive: true })
   window.addEventListener('pointercancel', handlePointerCancel, {
