@@ -3,14 +3,17 @@ import {
   RevealHeading,
 } from '@/components/common/TypographyEntrance'
 import { useState } from 'react'
-import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
+import { motion, useReducedMotion } from 'motion/react'
 import { ArrowUpRight, Plus } from 'lucide-react'
 import { Section } from '@/components/layout/Section'
 import { SectionDivider } from '@/components/common/SectionDivider'
 import { entranceTransition } from '@/animations/transitions'
 import { staggeredEntrance } from '@/animations/variants'
 import { featuredProjects } from '@/data/projects'
-import { ProjectPreview } from '@/features/projects/ProjectPreview'
+import {
+  DesktopProjectPreview,
+  ProjectPreview,
+} from '@/features/projects/ProjectPreview'
 import './selected-projects.css'
 
 export function SelectedProjects() {
@@ -102,7 +105,7 @@ export function SelectedProjects() {
                 {String(index + 1).padStart(2, '0')}
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block text-lg font-medium">
+                <span className="project-index-title block text-lg font-medium">
                   {project.title}
                 </span>
                 <span className="type-mono mt-2 block text-muted">
@@ -123,23 +126,12 @@ export function SelectedProjects() {
           className="project-preview-stage min-w-0"
           aria-live="polite"
         >
-          <AnimatePresence mode="wait" initial={false}>
-            <motion.div
-              key={active.id}
-              className="project-preview-frame"
-              initial={{ opacity: reduced ? 1 : 0, x: reduced ? 0 : 8 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: reduced ? 0 : -8 }}
-              transition={transition}
-            >
-              <ProjectPreview
-                project={active}
-                position={featuredProjects.indexOf(active) + 1}
-                total={featuredProjects.length}
-                desktop
-              />
-            </motion.div>
-          </AnimatePresence>
+          <DesktopProjectPreview
+            project={active}
+            position={featuredProjects.indexOf(active) + 1}
+            total={featuredProjects.length}
+            reduced={reduced}
+          />
         </div>
       </div>
       <div className="desktop:hidden">
@@ -185,11 +177,7 @@ export function SelectedProjects() {
               >
                 {open && (
                   <div className="pb-7">
-                    <ProjectPreview
-                      project={project}
-                      position={index + 1}
-                      total={featuredProjects.length}
-                    />
+                    <ProjectPreview project={project} />
                   </div>
                 )}
               </motion.div>

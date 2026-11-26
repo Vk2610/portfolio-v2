@@ -5,6 +5,7 @@ import {
 import { motion, useInView, useReducedMotion } from 'motion/react'
 import { useRef } from 'react'
 import { staggeredEntrance } from '@/animations/variants'
+import { useCountUp } from '@/animations/useCountUp'
 import { SectionDivider } from '@/components/common/SectionDivider'
 import { Section } from '@/components/layout/Section'
 import { technologies } from '@/data/technologies'
@@ -15,11 +16,18 @@ const statistics = [
   { value: '01', label: 'Internship' },
   { value: String(technologies.length), label: 'Technologies showcased' },
 ]
+const statisticValues = statistics.map(({ value }) => value)
 
 export function About() {
   const ref = useRef<HTMLDivElement>(null)
+  const statisticsRef = useRef<HTMLDListElement>(null)
   const entered = useInView(ref, { once: true, amount: 0.2 })
+  const statisticsEntered = useInView(statisticsRef, {
+    once: true,
+    amount: 0.2,
+  })
   const reduced = useReducedMotion() ?? false
+  const countRefs = useCountUp(statisticValues, statisticsEntered && !reduced)
   const { group, item } = staggeredEntrance('fade-up', reduced)
   const reveal = reduced || entered ? 'visible' : 'hidden'
 
@@ -59,14 +67,30 @@ export function About() {
       <div className="mt-12 tablet:mt-16">
         <SectionDivider />
         <motion.dl
+          ref={statisticsRef}
           variants={group}
           initial={reduced ? false : 'hidden'}
           animate={reveal}
           className="grid grid-cols-3 gap-4 py-7 tablet:gap-8 tablet:py-9"
         >
-          {statistics.map(({ value, label }) => (
+          {statistics.map(({ value, label }, index) => (
             <motion.div key={label} variants={item} className="min-w-0">
-              <dt className="type-h2">{value}</dt>
+              <dt className="type-h2 tabular-nums">
+                <span className="inline-grid">
+                  <span className="col-start-1 row-start-1 select-none opacity-0">
+                    {value}
+                  </span>
+                  <span
+                    aria-hidden="true"
+                    className="col-start-1 row-start-1"
+                    ref={(element) => {
+                      countRefs.current[index] = element
+                    }}
+                  >
+                    {value}
+                  </span>
+                </span>
+              </dt>
               <dd className="type-caption mt-2 text-muted">{label}</dd>
             </motion.div>
           ))}

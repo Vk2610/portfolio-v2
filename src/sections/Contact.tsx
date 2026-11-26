@@ -10,6 +10,7 @@ import { SectionDivider } from '@/components/common/SectionDivider'
 import { staggeredEntrance } from '@/animations/variants'
 import { motionMilliseconds } from '@/animations/transitions'
 import { profile } from '@/data/profile'
+import './contact-interactions.css'
 
 const rowGrid =
   'grid w-full grid-cols-[24px_minmax(0,1fr)_24px_24px] items-center gap-x-4'
@@ -31,33 +32,36 @@ export function Contact() {
 
   async function copyEmail() {
     const current = ++attempt.current
-    clearTimeout(timer.current)
-    setStatus('')
+    setStatus((previous) => (previous === 'Copied' ? previous : ''))
     try {
       await navigator.clipboard.writeText(profile.email)
       if (current !== attempt.current) return
+      clearTimeout(timer.current)
       setStatus('Copied')
       timer.current = setTimeout(
         () => setStatus(''),
         motionMilliseconds('--copy-reset'),
       )
     } catch {
-      if (current === attempt.current)
+      if (current === attempt.current) {
+        clearTimeout(timer.current)
         setStatus(
           'Unable to copy. Select the email address to copy it manually.',
         )
+      }
     }
   }
 
   const linkClass =
-    'group min-w-0 items-center py-6 text-secondary transition-colors duration-(--duration-normal) hover:text-foreground focus-visible:text-foreground motion-reduce:transition-none'
+    'contact-action group min-w-0 items-center py-6 text-secondary transition-colors duration-(--duration-normal) hover:text-foreground focus-visible:text-foreground motion-reduce:transition-none'
   const arrow = (
-    <ArrowUpRight
+    <span
       aria-hidden
-      size={18}
-      strokeWidth={1.5}
-      className="col-start-4 row-start-1 shrink-0 justify-self-end transition-transform duration-(--duration-normal) group-hover:translate-x-[3px] group-hover:-translate-y-[3px] group-focus-visible:translate-x-[3px] group-focus-visible:-translate-y-[3px] motion-reduce:transform-none motion-reduce:transition-none"
-    />
+      className="contact-arrow pointer-events-none col-start-4 row-start-1 grid size-[18px] overflow-hidden justify-self-end"
+    >
+      <ArrowUpRight size={18} strokeWidth={1.5} />
+      <ArrowUpRight size={18} strokeWidth={1.5} />
+    </span>
   )
 
   return (
@@ -108,7 +112,7 @@ export function Contact() {
           >
             <a
               href={`mailto:${profile.email}`}
-              className={`${linkClass} ${rowGrid} col-span-full col-start-1 row-start-1`}
+              className={`${linkClass} contact-underline ${rowGrid} col-span-full col-start-1 row-start-1`}
             >
               <Mail
                 size={24}
@@ -117,7 +121,7 @@ export function Contact() {
                 aria-hidden
               />
               <span className="min-w-0">
-                <span className="block text-lg font-medium">Email</span>
+                <span className="contact-title text-lg font-medium">Email</span>
                 <span className="type-mono mt-2 block break-words">
                   {profile.email}
                 </span>
@@ -132,11 +136,14 @@ export function Contact() {
               onClick={copyEmail}
               className="control-target z-10 col-start-3 row-start-1 grid place-items-center justify-self-center text-secondary transition-colors duration-(--duration-fast) hover:text-foreground focus-visible:text-foreground motion-reduce:transition-none"
             >
-              {status === 'Copied' ? (
-                <Check size={18} strokeWidth={1.5} aria-hidden />
-              ) : (
-                <Copy size={18} strokeWidth={1.5} aria-hidden />
-              )}
+              <span
+                aria-hidden
+                data-copied={status === 'Copied'}
+                className="contact-copy-icons pointer-events-none grid size-[18px]"
+              >
+                <Copy size={18} strokeWidth={1.5} />
+                <Check size={18} strokeWidth={1.5} />
+              </span>
             </button>
           </motion.div>
           {[
@@ -181,18 +188,16 @@ export function Contact() {
                 href={social.href}
                 target="_blank"
                 rel="noopener noreferrer"
-                className={`${linkClass} underline-reveal block w-full font-medium`}
+                className={`${linkClass} contact-underline ${rowGrid} w-full font-medium`}
               >
-                <span data-underline-label className={rowGrid}>
-                  {social.icon}
-                  <span className="min-w-0">
-                    <span className="block text-lg">{social.title}</span>
-                    <span className="type-mono mt-2 block">
-                      {social.metadata}
-                    </span>
+                {social.icon}
+                <span className="min-w-0">
+                  <span className="contact-title text-lg">{social.title}</span>
+                  <span className="type-mono mt-2 block">
+                    {social.metadata}
                   </span>
-                  {arrow}
                 </span>
+                {arrow}
               </a>
             </motion.div>
           ))}

@@ -12,6 +12,8 @@ Phase 07A.2 implements the Hero name mask (850ms with 135ms stagger), title focu
 
 Phase 07A.3 implements two scoped improvements: the primary CTA rolling fill and Technology Stack grouped focus with technical metadata. Manual desktop, keyboard and touch verification is pending.
 
+Phase 07A.3 also implements the desktop project cover reveal, index title shift and staggered details, the About count-up, and Contact copy and arrow transitions. Manual visual verification and the global motion consistency review are pending.
+
 ## Suggested source tree
 src/components/ui, common, layout; src/sections/{Hero,ProfessionalStatus,About,TechStack,Experience,Projects,Contact}; src/features/particle-background/{ParticleBackground.tsx,particle-config.ts,particle-engine.ts}; src/features/technology-network/{NetworkSvg.tsx,network-svg-renderer.ts,network-engine.ts,network-interactions.ts,network-config.ts,network.types.ts,OrbitalCursor.tsx}; src/animations/{variants,transitions}.ts; src/data/{profile,technologies,experience,projects}.ts; src/hooks; src/lib; src/types; src/styles/{globals,tokens}.css; src/App.tsx; src/main.tsx; public/{images,fonts,icons/technologies}; tests. Adjust only with justification.
 
