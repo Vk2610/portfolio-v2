@@ -5,6 +5,7 @@ import {
   resolveHeroWorldOrigin,
 } from '@/features/robot-surfaces/surface-registry'
 import { createSurfacePhysicsWorld } from '@/features/robot-surfaces/surface-physics'
+import { evaluatePlatformBounds } from '@/features/robot-surfaces/platform-movement'
 
 describe('DOM surface detection and Rapier physics', () => {
   afterEach(() => {
@@ -143,5 +144,31 @@ describe('DOM surface detection and Rapier physics', () => {
     } finally {
       physics.dispose()
     }
+  })
+
+  it('evaluates wide, narrow, and insufficient platform widths', () => {
+    const base = {
+      id: 'p1',
+      kind: 'section-divider',
+      x: 1,
+      y: -5,
+      z: 0,
+      depth: 1.6,
+      docLeft: 0,
+      docTop: 0,
+      pxWidth: 100,
+    }
+    const wide = evaluatePlatformBounds({ ...base, width: 6 }, 0.55)
+    expect(wide.canStand).toBe(true)
+    expect(wide.canWalk).toBe(true)
+    expect(wide.minX).toBeLessThan(wide.maxX)
+
+    const narrow = evaluatePlatformBounds({ ...base, width: 1.3 }, 0.55)
+    expect(narrow.canStand).toBe(true)
+    expect(narrow.canWalk).toBe(false)
+
+    const tiny = evaluatePlatformBounds({ ...base, width: 0.8 }, 0.55)
+    expect(tiny.canStand).toBe(false)
+    expect(tiny.canWalk).toBe(false)
   })
 })

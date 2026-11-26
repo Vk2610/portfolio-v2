@@ -1,4 +1,4 @@
-/* global window, document, performance, ResizeObserver, IntersectionObserver */
+/* global window, document, performance, CustomEvent, ResizeObserver, IntersectionObserver */
 import {
   ACESFilmicToneMapping,
   Box3,
@@ -23,6 +23,8 @@ import { computeHeroRobotPlacement } from './hero-robot-placement'
 import { createMagneticRobotCursor } from './magnetic-cursor'
 import { observePortfolioSurfaces } from '@/features/robot-surfaces/surface-observer'
 import { createSurfacePhysicsWorld } from '@/features/robot-surfaces/surface-physics'
+import { resolveHeroWorldOrigin } from '@/features/robot-surfaces/surface-registry'
+import { evaluatePlatformBounds } from '@/features/robot-surfaces/platform-movement'
 
 function createStudioEnvironment(renderer) {
   const studio = new Scene()
@@ -74,7 +76,16 @@ export function mountHeroRobot(host, container, heading) {
   renderer.domElement.style.width = '100%'
   renderer.domElement.style.height = '100%'
   renderer.domElement.style.pointerEvents = 'none'
-  host.append(renderer.domElement)
+  const stageOverlay = document.createElement('div')
+  stageOverlay.setAttribute('aria-hidden', 'true')
+  stageOverlay.setAttribute('data-hero-robot-stage', '')
+  stageOverlay.style.position = 'fixed'
+  stageOverlay.style.inset = '0'
+  stageOverlay.style.zIndex = '30'
+  stageOverlay.style.pointerEvents = 'none'
+  stageOverlay.style.overflow = 'hidden'
+  stageOverlay.append(renderer.domElement)
+  document.body.append(stageOverlay)
 
   const scene = new Scene()
   const lighting = createStudioEnvironment(renderer)
@@ -105,8 +116,9 @@ export function mountHeroRobot(host, container, heading) {
   camera.position.set(0, 0, 10)
   camera.lookAt(0, 0, 0)
 
+  let activeSurfaceY = 0
   const physics = {
-    floorAt: () => 0,
+    floorAt: () => activeSurfaceY,
     updateSurfaces: () => {},
     dispose: () => {},
   }
@@ -130,7 +142,12 @@ export function mountHeroRobot(host, container, heading) {
   let cyclePhase = 'idle'
   let phaseRemaining = 5
   let walkDir = -1
-  let limitX = 1.5
+  let minX = -1.5
+  let maxX = 1.5
+  let canWalkPlatform = true
+  let supportLost = false
+  let activePlatformId = 'hero-platform-1'
+  let worldOrigin = null
   let spawned = false
   let tap = null
   let hasPointer = false
@@ -139,26 +156,35 @@ export function mountHeroRobot(host, container, heading) {
 
   function updateCamera(width, height) {
     const aspect = width / Math.max(1, height)
-    const viewHeight = modelHeight * 1.35
-    const halfW = (viewHeight * aspect) / 2
-    camera.left = -halfW
-    camera.right = halfW
-    camera.bottom = minY
-    camera.top = minY + viewHeight
-    camera.updateProjectionMatrix()
-    renderer.setSize(width, height, false)
+    const halfW = (viewHeightWorld * aspect) / 2
+    worldOrigin = resolveHeroWorldOrigin(host, viewHeightWorld)
 
-    limitX = Math.max(0.25, Math.min(1.95, halfW - robotHalfWidth - 0.08))
+    const vw = window.innerWidth || 1
+    const vh = window.innerHeight || 1
+    renderer.setSize(vw, vh, false)
 
     if (!spawned) {
       spawned = true
+      const walkSpan = Math.max(0.5, (halfW - robotHalfWidth - 0.08) * 2)
+      minX = -walkSpan / 2
+      maxX = walkSpan / 2
       robot.root.position.x = 0
-    } else {
-      robot.root.position.x = Math.max(
-        -limitX,
-        Math.min(limitX, robot.root.position.x),
-      )
     }
+  }
+
+  function syncCameraToViewport() {
+    if (!worldOrigin) return
+    const vw = window.innerWidth || 1
+    const vh = window.innerHeight || 1
+    const scrollX = window.scrollX || window.pageXOffset || 0
+    const scrollY = window.scrollY || window.pageYOffset || 0
+    const { anchorDocX, anchorDocY, pxPerWorldUnit } = worldOrigin
+
+    camera.left = (scrollX - anchorDocX) / pxPerWorldUnit
+    camera.right = (scrollX + vw - anchorDocX) / pxPerWorldUnit
+    camera.top = (anchorDocY - scrollY) / pxPerWorldUnit
+    camera.bottom = (anchorDocY - (scrollY + vh)) / pxPerWorldUnit
+    camera.updateProjectionMatrix()
   }
 
   function syncPlacement() {
@@ -200,12 +226,16 @@ export function mountHeroRobot(host, container, heading) {
       const statusBefore = movement.status()
       const canAdvanceCycle =
         !tap?.rotating &&
+        !supportLost &&
         emotionFrame.current === 'neutral' &&
         !movement.isLocked() &&
         statusBefore.grounded
 
       if (canAdvanceCycle) {
-        if (cyclePhase === 'idle') {
+        if (!canWalkPlatform) {
+          movement.stop()
+          movement.faceYaw(0)
+        } else if (cyclePhase === 'idle') {
           movement.stop()
           if (statusBefore.state === 'idle') {
             phaseRemaining -= dt
@@ -219,11 +249,11 @@ export function mountHeroRobot(host, container, heading) {
         } else {
           phaseRemaining -= dt
           const x = robot.root.position.x
-          if (walkDir < 0 && x <= -limitX) {
+          if (walkDir < 0 && x <= minX) {
             walkDir = 1
             movement.walk(1)
             movement.faceYaw(Math.PI / 2)
-          } else if (walkDir > 0 && x >= limitX) {
+          } else if (walkDir > 0 && x >= maxX) {
             walkDir = -1
             movement.walk(-1)
             movement.faceYaw(-Math.PI / 2)
@@ -252,10 +282,24 @@ export function mountHeroRobot(host, container, heading) {
       tracking.step(timeMs, dt, status.state, emotionFrame.current, reduced)
     }
     robot.root.position.x = Math.max(
-      -limitX,
-      Math.min(limitX, robot.root.position.x),
+      minX,
+      Math.min(maxX, robot.root.position.x),
     )
     robot.root.updateMatrixWorld(true)
+    syncCameraToViewport()
+    if (import.meta.env.DEV) {
+      window.dispatchEvent(
+        new CustomEvent('portfolio:robot-telemetry', {
+          detail: {
+            platformId: activePlatformId,
+            state: status.state,
+            minX,
+            maxX,
+            supportLost,
+          },
+        }),
+      )
+    }
     if (tap?.rotating && tap.pointerType !== 'touch' && !reduced) {
       magneticCursor.setHover(true)
     } else if (hasPointer && !reduced) {
@@ -487,13 +531,58 @@ export function mountHeroRobot(host, container, heading) {
     onSurfacesChange: (surfaces) => {
       latestSurfaces = surfaces
       surfacePhysics?.sync(surfaces)
+      const current = surfaces.find((s) => s.id === activePlatformId)
+      if (!current) {
+        supportLost = true
+        canWalkPlatform = false
+        return
+      }
+      const evaluated = evaluatePlatformBounds(current, robotHalfWidth)
+      supportLost = !evaluated.canStand
+      canWalkPlatform = evaluated.canWalk
+      activeSurfaceY = current.y
+      minX = evaluated.minX
+      maxX = evaluated.maxX
+      robot.root.position.x = Math.max(
+        minX,
+        Math.min(maxX, robot.root.position.x),
+      )
+      robot.root.position.y = activeSurfaceY
     },
   })
+
+  const handlePlaceRobot = (event) => {
+    if (!import.meta.env.DEV) return
+    const targetId = event.detail?.platformId
+    if (!targetId) return
+    const target = latestSurfaces.find((s) => s.id === targetId)
+    if (!target) return
+    const evaluated = evaluatePlatformBounds(target, robotHalfWidth)
+    if (!evaluated.canStand) return
+    activePlatformId = target.id
+    supportLost = false
+    canWalkPlatform = evaluated.canWalk
+    activeSurfaceY = target.y
+    minX = evaluated.minX
+    maxX = evaluated.maxX
+    cyclePhase = 'idle'
+    phaseRemaining = 5
+    movement.stagePlatform(target.y, target.x)
+    movement.stop()
+    movement.faceYaw(0)
+    startLoop()
+  }
+  if (import.meta.env.DEV) {
+    window.addEventListener('portfolio:place-robot', handlePlaceRobot)
+  }
 
   return () => {
     disposed = true
     stopLoop()
     stopObservingSurfaces()
+    if (import.meta.env.DEV) {
+      window.removeEventListener('portfolio:place-robot', handlePlaceRobot)
+    }
     surfacePhysics?.dispose()
     resizeObserver?.disconnect()
     intersectionObserver?.disconnect()
@@ -523,6 +612,6 @@ export function mountHeroRobot(host, container, heading) {
       }
     })
     renderer.dispose()
-    renderer.domElement.remove()
+    stageOverlay.remove()
   }
 }

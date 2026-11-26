@@ -162,7 +162,6 @@ export function createMovement(robot, physics, emotions, physicsOptions) {
     }
     floor = support
     root.position.y = floor
-    if (Math.abs(root.position.x) > 2.05 && route) route = 0
     const legScale = body.scale.x * root.scale.x
     const stride = Math.min(
       (options.strideLength * legScale) / 0.6,
