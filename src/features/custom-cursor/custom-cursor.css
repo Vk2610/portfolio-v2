@@ -98,6 +98,13 @@ html[data-custom-cursor='active']:not([data-cursor-native='true']) * {
   cursor: none !important;
 }
 
+html[data-custom-cursor='active'][data-cursor-native='true'] a[href],
+html[data-custom-cursor='active'][data-cursor-native='true'] button,
+html[data-custom-cursor='active'][data-cursor-native='true'] [role='button'],
+html[data-custom-cursor='active'][data-cursor-native='true'] [role='tab'] {
+  cursor: pointer !important;
+}
+
 @media (prefers-reduced-motion: reduce), (hover: none), (pointer: coarse) {
   .custom-cursor-overlay,
   .custom-cursor-spotlight-layer {

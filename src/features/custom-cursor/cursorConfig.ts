@@ -10,8 +10,8 @@ export interface CursorVariantSpec {
 
 export const CURSOR_VARIANTS: Record<CursorVariant, CursorVariantSpec> = {
   default: { size: 6, isRing: false },
-  button: { size: 42, isRing: true },
-  nav: { size: 28, isRing: true },
+  button: { size: 42, isRing: true, hideGlobalCursor: true },
+  nav: { size: 28, isRing: true, hideGlobalCursor: true },
   heading: { size: 48, isRing: false, isSpotlight: true },
   text: { size: 0, isRing: false, hideGlobalCursor: true },
   network: { size: 0, isRing: false, hideGlobalCursor: true },

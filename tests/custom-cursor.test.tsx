@@ -89,6 +89,7 @@ describe('custom cursor system', () => {
       <div>
         <CustomCursor />
         <button type="button">Action</button>
+        <a href="#target">Link</a>
         <figure data-cursor="network">Network</figure>
       </div>,
     )
@@ -108,7 +109,22 @@ describe('custom cursor system', () => {
     })
     expect(root.style.transform).toBe('translate3d(120px, 240px, 0px)')
     expect(root.dataset.variant).toBe('button')
-    expect(root.dataset.visible).toBe('true')
+    expect(root.dataset.visible).toBe('false')
+    expect(document.documentElement.getAttribute('data-cursor-native')).toBe(
+      'true',
+    )
+
+    const link = container.querySelector('a') as HTMLElement
+    fireEvent.pointerMove(link, {
+      clientX: 121,
+      clientY: 241,
+      pointerType: 'mouse',
+    })
+    expect(root.dataset.variant).toBe('nav')
+    expect(root.dataset.visible).toBe('false')
+    expect(document.documentElement.getAttribute('data-cursor-native')).toBe(
+      'true',
+    )
 
     fireEvent.pointerDown(button, { pointerType: 'mouse' })
     expect(root.dataset.pressed).toBe('true')
