@@ -384,10 +384,10 @@ export function mountHeroRobot(host, container, heading) {
       )
       robot.root.quaternion.identity()
     }
-    if (
+    const justLanded =
       ['DESCENDING', 'LANDING'].includes(prevFlightState) &&
       flightFrame.state === 'GROUNDED'
-    ) {
+    if (justLanded) {
       forceNitro = false
       nitroBoosters.setForced(false)
       window.dispatchEvent(
@@ -417,7 +417,8 @@ export function mountHeroRobot(host, container, heading) {
     if (prevFlightState !== flightFrame.state) transitionCount++
     prevFlightState = flightFrame.state
 
-    if (!reduced && !flightFrame.isFlying) {
+    // Let movement process the new face request before patrol reads its state.
+    if (!reduced && !flightFrame.isFlying && !justLanded) {
       const statusBefore = movement.status()
       const canAdvanceCycle =
         !flightFrame.isFlying &&

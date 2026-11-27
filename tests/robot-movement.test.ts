@@ -40,6 +40,7 @@ describe('H1 movement', () => {
     try {
       movement.rotateBy(Math.PI / 2)
       movement.faceYaw(0)
+      expect(movement.status().state).toBe('idle')
       expect(tick().state).toBe('turning')
       let state = 'turning'
       for (let i = 0; i < 120 && state === 'turning'; i++) state = tick().state
