@@ -41,12 +41,13 @@ export interface FlightController {
   getInactiveTime: () => number
   approach: () => boolean
   beginLanding: () => boolean
-  step: (dt: number, reduced: boolean) => FlightPoseFrame
+  step: (dt: number, reduced: boolean, ready?: boolean) => FlightPoseFrame
 }
 
 export function createFlightController(): FlightController {
   let state: FlightState = 'GROUNDED'
   let elapsed = 0
+  let phase = 0
   let hoverOffset = 0
   let startDescendHeight = TARGET_HOVER_HEIGHT
   let inactiveTime = 0
@@ -63,6 +64,11 @@ export function createFlightController(): FlightController {
   }
 
   function setScrolling(active: boolean) {
+    if (
+      active === scrolling &&
+      !(active && ['APPROACHING', 'LANDING', 'DESCENDING'].includes(state))
+    )
+      return
     scrolling = active
     if (state === 'GROUNDED') return
     if (active && ['APPROACHING', 'LANDING', 'DESCENDING'].includes(state)) {
@@ -107,9 +113,11 @@ export function createFlightController(): FlightController {
     hoverOffset = 0
     startDescendHeight = TARGET_HOVER_HEIGHT
     inactiveTime = 0
+    scrolling = false
+    phase = 0
   }
 
-  function step(dt: number, reduced: boolean): FlightPoseFrame {
+  function step(dt: number, reduced: boolean, ready = true): FlightPoseFrame {
     if (state === 'GROUNDED') {
       hoverOffset = 0
       return {
@@ -124,6 +132,7 @@ export function createFlightController(): FlightController {
     }
 
     elapsed += dt
+    phase += dt
 
     if (state === 'TAKEOFF') {
       if (elapsed >= TAKEOFF_DURATION) {
@@ -153,10 +162,7 @@ export function createFlightController(): FlightController {
 
     if (state === 'APPROACHING') {
       hoverOffset = TARGET_HOVER_HEIGHT
-      if (elapsed >= 1) {
-        state = 'LANDING'
-        elapsed = 0
-      }
+      if (elapsed >= 1 && ready) beginLanding()
       return {
         state,
         hoverOffset,
@@ -170,7 +176,7 @@ export function createFlightController(): FlightController {
     if (state === 'LANDING') {
       const t = smoothstep(0, 0.9, elapsed)
       hoverOffset = startDescendHeight * (1 - t)
-      if (elapsed >= 0.9) {
+      if (elapsed >= 0.9 && ready) {
         state = 'GROUNDED'
         hoverOffset = 0
         return {
@@ -196,25 +202,25 @@ export function createFlightController(): FlightController {
     if (state === 'TRAVELLING' || state === 'HOVERING') {
       if (state === 'HOVERING') inactiveTime += dt
       else inactiveTime = 0
-      const bob = reduced ? 0 : Math.sin(elapsed * 2.6) * 0.055
+      const bob = reduced ? 0 : Math.sin(phase * 2.6) * 0.055
       hoverOffset = TARGET_HOVER_HEIGHT + bob
       const boosterIntensity = reduced
         ? 0.75
-        : 0.78 + Math.sin(elapsed * 2.6 + 0.4) * 0.08
-      const armSpread = 0.32 + (reduced ? 0 : Math.sin(elapsed * 2.6) * 0.03)
+        : 0.78 + Math.sin(phase * 2.6 + 0.4) * 0.08
+      const armSpread = 0.32 + (reduced ? 0 : Math.sin(phase * 2.6) * 0.03)
       return {
         state,
         hoverOffset,
         boosterIntensity,
         kneeBend: 0,
         armSpread,
-        legExtend: 0.1 + (reduced ? 0 : Math.sin(elapsed * 2.6 - 0.5) * 0.025),
+        legExtend: 0.1 + (reduced ? 0 : Math.sin(phase * 2.6 - 0.5) * 0.025),
         isFlying: true,
       }
     }
 
     // DESCENDING
-    if (elapsed >= DESCENDING_DURATION) {
+    if (elapsed >= DESCENDING_DURATION && ready) {
       state = 'GROUNDED'
       elapsed = 0
       hoverOffset = 0

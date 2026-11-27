@@ -22,9 +22,13 @@ import { createHeadTracking } from '@/features/robot-preview/head-tracking.js'
 import { computeHeroRobotPlacement } from './hero-robot-placement'
 import { createMagneticRobotCursor } from './magnetic-cursor'
 import { createNitroBoosters } from './nitro-boosters.js'
-import { createFlightController } from './flight-controller'
+import {
+  createFlightController,
+  TARGET_HOVER_HEIGHT,
+} from './flight-controller'
 import { observePortfolioSurfaces } from '@/features/robot-surfaces/surface-observer'
-import { createSurfacePhysicsWorld } from '@/features/robot-surfaces/surface-physics'
+import { createRobotFrameLoop } from './robot-frame-loop'
+import { advanceFlightPosition } from './flight-motion'
 import { resolveHeroWorldOrigin } from '@/features/robot-surfaces/surface-registry'
 import { evaluatePlatformBounds } from '@/features/robot-surfaces/platform-movement'
 import { selectLandingPoint } from './landing-position'
@@ -121,9 +125,16 @@ export function mountHeroRobot(host, container, heading) {
 
   let initialized = false
   let disposed = false
-  let raf = 0
+  let placementDirty = true
+  let visible = false
+  let pointerDirty = false
+  let pendingScrollY = window.scrollY
+  let scrollActive = false
+  let transitionCount = 0
+  let largestFrameDisplacement = 0
+  const flightVelocity = { x: 0, y: 0 }
+  let cameraDirty = true
   let activeSurfaceY = 0
-  let lastTime = 0
   let cyclePhase = 'idle'
   let phaseRemaining = 5
   let walkDir = -1
@@ -143,7 +154,6 @@ export function mountHeroRobot(host, container, heading) {
   let scrollDirection = 'none'
   let scrollVelocity = 0
   let lastScrollAt = 0
-  let scrollStopTimer = 0
   let travelTarget = null
   let flightOrigin = null
   let landingDestination = null
@@ -165,8 +175,11 @@ export function mountHeroRobot(host, container, heading) {
     },
   })
   const movement = createMovement(robot, physics, emotions, physicsDefaults)
-  const tracking = createHeadTracking(movement.rig, camera, () =>
-    renderer.domElement.getBoundingClientRect(),
+  const trackingViewport = { left: 0, top: 0, width: 1, height: 1 }
+  const tracking = createHeadTracking(
+    movement.rig,
+    camera,
+    () => trackingViewport,
   )
   const magneticCursor = createMagneticRobotCursor()
   const nitroBoosters = createNitroBoosters(scene, movement.rig.sides)
@@ -175,11 +188,16 @@ export function mountHeroRobot(host, container, heading) {
   function updateCamera(width, height) {
     const aspect = width / Math.max(1, height)
     const halfW = (viewHeightWorld * aspect) / 2
-    worldOrigin = resolveHeroWorldOrigin(host, viewHeightWorld)
+    worldOrigin ??= resolveHeroWorldOrigin(host, viewHeightWorld)
+    cameraDirty = true
 
     const vw = window.innerWidth || 1
     const vh = window.innerHeight || 1
-    renderer.setSize(vw, vh, false)
+    if (trackingViewport.width !== vw || trackingViewport.height !== vh) {
+      trackingViewport.width = vw
+      trackingViewport.height = vh
+      renderer.setSize(vw, vh, false)
+    }
 
     if (!spawned) {
       spawned = true
@@ -198,11 +216,16 @@ export function mountHeroRobot(host, container, heading) {
     const scrollY = window.scrollY || window.pageYOffset || 0
     const { anchorDocX, anchorDocY, pxPerWorldUnit } = worldOrigin
 
-    camera.left = (scrollX - anchorDocX) / pxPerWorldUnit
-    camera.right = (scrollX + vw - anchorDocX) / pxPerWorldUnit
-    camera.top = (anchorDocY - scrollY) / pxPerWorldUnit
-    camera.bottom = (anchorDocY - (scrollY + vh)) / pxPerWorldUnit
+    const left = (scrollX - anchorDocX) / pxPerWorldUnit
+    const top = (anchorDocY - scrollY) / pxPerWorldUnit
+    if (!cameraDirty && camera.left === left && camera.top === top) return
+    cameraDirty = false
+    camera.left = left
+    camera.right = left + vw / pxPerWorldUnit
+    camera.top = top
+    camera.bottom = top - vh / pxPerWorldUnit
     camera.updateProjectionMatrix()
+    camera.updateMatrixWorld()
   }
 
   function syncPlacement() {
@@ -217,30 +240,62 @@ export function mountHeroRobot(host, container, heading) {
   }
 
   function hitRobot(clientX, clientY) {
-    const rect = renderer.domElement.getBoundingClientRect()
-    if (
-      clientX < rect.left ||
-      clientX > rect.right ||
-      clientY < rect.top ||
-      clientY > rect.bottom
-    ) {
+    if (!initialized || disposed || !visible) return false
+    const width = window.innerWidth
+    const height = window.innerHeight
+    if (clientX < 0 || clientX > width || clientY < 0 || clientY > height) {
       return false
     }
-    ndc.x = ((clientX - rect.left) / Math.max(1, rect.width)) * 2 - 1
-    ndc.y = -((clientY - rect.top) / Math.max(1, rect.height)) * 2 + 1
+    ndc.x = (clientX / Math.max(1, width)) * 2 - 1
+    ndc.y = -(clientY / Math.max(1, height)) * 2 + 1
     raycaster.setFromCamera(ndc, camera)
     return raycaster.intersectObjects(robot.hitMeshes, false).length > 0
   }
 
-  function stepSimulation(timeMs) {
+  function stepSimulation(timeMs, dt) {
     const reduced = motionQuery?.matches ?? false
-    const dt = lastTime ? Math.min((timeMs - lastTime) / 1000, 0.05) : 0.016
-    lastTime = timeMs
+    if (placementDirty) {
+      placementDirty = false
+      syncPlacement()
+    }
+    syncCameraToViewport()
+    if (!reduced) processScroll(timeMs)
+    else previousScrollY = pendingScrollY
+    if (landingDestination) {
+      const surface = latestSurfaces.find(
+        ({ id }) => id === landingDestination.platformId,
+      )
+      if (
+        !surface ||
+        Math.abs(surface.y - landingDestination.y) > 0.01 ||
+        Math.abs(surface.x - landingDestination.x) + robotHalfWidth >
+          surface.width / 2
+      ) {
+        flight.setScrolling(true)
+        flight.setScrolling(false)
+        travelTarget = {
+          x: robot.root.position.x,
+          y: robot.root.position.y - TARGET_HOVER_HEIGHT,
+        }
+        landingDestination = null
+      }
+    }
+    const startX = robot.root.position.x
+    const startY = robot.root.position.y
 
     const emotionFrame = emotions.frame(timeMs, reduced)
     robot.face.update(emotionFrame, timeMs, reduced)
 
-    const flightFrame = flight.step(dt, reduced)
+    const target =
+      landingDestination ??
+      (flight.getState() === 'DESCENDING' ? flightOrigin : null)
+    const approach = flight.getState() === 'APPROACHING'
+    const ready =
+      !target ||
+      (Math.abs(startX - target.x) <= 0.01 &&
+        Math.abs(startY - target.y - (approach ? TARGET_HOVER_HEIGHT : 0)) <=
+          0.01)
+    const flightFrame = flight.step(dt, reduced, ready)
     if (
       flightFrame.state === 'HOVERING' &&
       flight.getInactiveTime() >= 2.5 &&
@@ -281,6 +336,7 @@ export function mountHeroRobot(host, container, heading) {
             robot.root.position.x,
             robot.root.position.y,
             surface.y,
+            scrollDirection === 'up' ? 'up' : 'down',
           )
           return {
             surface,
@@ -293,6 +349,8 @@ export function mountHeroRobot(host, container, heading) {
         .filter((candidate) => candidate.eligible && candidate.point)
         .sort(
           (a, b) =>
+            Number(b.point.inTravelDirection) -
+              Number(a.point.inTravelDirection) ||
             Number(b.point.directlyBelow) - Number(a.point.directlyBelow) ||
             a.distance - b.distance ||
             b.bounds.walkableWidth - a.bounds.walkableWidth,
@@ -311,11 +369,19 @@ export function mountHeroRobot(host, container, heading) {
       }
     }
     if (flightFrame.isFlying && travelTarget && worldOrigin) {
-      const follow = 1 - Math.exp(-dt * 5.5)
-      robot.root.position.x += (travelTarget.x - robot.root.position.x) * follow
-      robot.root.position.y +=
-        (travelTarget.y + flightFrame.hoverOffset - robot.root.position.y) *
-        follow
+      const targetX =
+        landingDestination &&
+        startY < landingDestination.y + 0.15 &&
+        flightFrame.state === 'APPROACHING'
+          ? startX
+          : travelTarget.x
+      advanceFlightPosition(
+        robot.root.position,
+        flightVelocity,
+        targetX,
+        travelTarget.y + flightFrame.hoverOffset,
+        dt,
+      )
       robot.root.quaternion.identity()
     }
     if (
@@ -343,13 +409,15 @@ export function mountHeroRobot(host, container, heading) {
         travelTarget = null
       }
       cyclePhase = 'idle'
-      phaseRemaining = 5
+      phaseRemaining = 3
+      flightVelocity.x = flightVelocity.y = 0
       movement.stop()
       movement.faceYaw(0)
     }
+    if (prevFlightState !== flightFrame.state) transitionCount++
     prevFlightState = flightFrame.state
 
-    if (!reduced) {
+    if (!reduced && !flightFrame.isFlying) {
       const statusBefore = movement.status()
       const canAdvanceCycle =
         !flightFrame.isFlying &&
@@ -396,9 +464,6 @@ export function mountHeroRobot(host, container, heading) {
             movement.faceYaw(0)
           }
         }
-      } else if (flightFrame.isFlying) {
-        movement.stop()
-        movement.faceYaw(0)
       } else if (tap?.rotating) {
         movement.stop()
       } else {
@@ -412,6 +477,7 @@ export function mountHeroRobot(host, container, heading) {
     if (flightFrame.isFlying) {
       movement.rig.rest()
     } else {
+      movement.syncSupportHeight(activeSurfaceY)
       movement.update(timeMs, dt, reduced)
     }
     if (flightFrame.isFlying) {
@@ -451,17 +517,44 @@ export function mountHeroRobot(host, container, heading) {
     )
 
     const status = movement.status()
-    if (!tap?.rotating) {
-      tracking.step(timeMs, dt, status.state, emotionFrame.current, reduced)
-    }
     if (!flightFrame.isFlying)
       robot.root.position.x = Math.max(
         minX,
         Math.min(maxX, robot.root.position.x),
       )
     robot.root.updateMatrixWorld(true)
-    syncCameraToViewport()
+    const { x, y } = robot.root.position
+    const nextVisible = Boolean(
+      worldOrigin &&
+      x + robotHalfWidth >= camera.left &&
+      x - robotHalfWidth <= camera.right &&
+      y + bounds.max.y >= camera.bottom &&
+      y + bounds.min.y <= camera.top,
+    )
+    if (!nextVisible && visible) {
+      tracking.reset()
+      hasPointer = false
+      tap = null
+    }
+    visible = nextVisible
+    if (visible && !tap?.rotating) {
+      if (pointerDirty && hasPointer)
+        tracking.point(lastPointerX, lastPointerY, timeMs)
+      tracking.step(
+        timeMs,
+        dt,
+        flightFrame.isFlying ? 'falling' : status.state,
+        emotionFrame.current,
+        reduced,
+      )
+      movement.rig.look.updateMatrixWorld(true)
+    }
+    pointerDirty = false
     if (import.meta.env.DEV) {
+      largestFrameDisplacement = Math.max(
+        largestFrameDisplacement,
+        Math.hypot(x - startX, y - startY),
+      )
       if (timeMs - lastTelemetryAt >= 100) {
         lastTelemetryAt = timeMs
         window.dispatchEvent(
@@ -484,9 +577,15 @@ export function mountHeroRobot(host, container, heading) {
               },
               targetPosition: travelTarget,
               booster: nitroBoosters.diagnostics(),
+              activeSimulationLoops: 1,
+              transitionCount,
+              positionOwner: flightFrame.isFlying ? 'flight' : 'grounded',
+              frameTimeMs: dt * 1000,
+              largestFrameDisplacement,
             },
           }),
         )
+        largestFrameDisplacement = 0
       }
     }
     if (tap?.rotating && tap.pointerType !== 'touch' && !reduced) {
@@ -500,29 +599,20 @@ export function mountHeroRobot(host, container, heading) {
     renderer.render(scene, camera)
   }
 
-  function stopLoop() {
-    if (raf) {
-      window.cancelAnimationFrame(raf)
-      raf = 0
-    }
-  }
-
-  function frame(timeMs) {
-    raf = 0
-    if (disposed) return
-    stepSimulation(timeMs)
-    if (!document.hidden && !(motionQuery?.matches ?? false)) {
-      raf = window.requestAnimationFrame(frame)
-    }
-  }
+  const loop = createRobotFrameLoop(
+    (callback) => window.requestAnimationFrame(callback),
+    (id) => window.cancelAnimationFrame(id),
+    stepSimulation,
+    () =>
+      !document.hidden &&
+      (!(motionQuery?.matches ?? false) ||
+        ['TAKEOFF', 'APPROACHING', 'LANDING', 'DESCENDING'].includes(
+          flight.getState(),
+        )),
+  )
 
   function startLoop() {
-    if (!initialized || disposed || raf) return
-    lastTime = 0
-    stepSimulation(performance.now())
-    if (!document.hidden && !(motionQuery?.matches ?? false)) {
-      raf = window.requestAnimationFrame(frame)
-    }
+    if (initialized && !disposed && !document.hidden) loop.schedule()
   }
 
   const resizeObserver =
@@ -530,13 +620,13 @@ export function mountHeroRobot(host, container, heading) {
       ? null
       : new ResizeObserver(() => {
           if (!initialized || disposed) return
-          syncPlacement()
-          stepSimulation(performance.now())
+          handleResize()
         })
   resizeObserver?.observe(heading)
   resizeObserver?.observe(container)
 
   const handlePointerMove = (event) => {
+    if (!initialized || disposed || !visible) return
     if (tap && tap.id === event.pointerId) {
       const moved = Math.hypot(event.clientX - tap.x, event.clientY - tap.y)
       if (!tap.rotating && moved > 5) {
@@ -565,9 +655,7 @@ export function mountHeroRobot(host, container, heading) {
     lastPointerX = event.clientX
     lastPointerY = event.clientY
     magneticCursor.setPointer(event.clientX, event.clientY)
-    if (!event.buttons) {
-      tracking.point(event.clientX, event.clientY, performance.now())
-    }
+    pointerDirty = !event.buttons
   }
   const handlePointerDown = (event) => {
     if (
@@ -662,21 +750,30 @@ export function mountHeroRobot(host, container, heading) {
     magneticCursor.setHover(false)
   }
   const handleResize = () => {
-    syncPlacement()
-    stepSimulation(performance.now())
+    placementDirty = true
+    startLoop()
   }
   let previousScrollY = window.scrollY
   const handleScroll = () => {
-    const now = performance.now()
-    const current = window.scrollY
-    const delta = current - previousScrollY
-    previousScrollY = current
-    if (Math.abs(delta) < 3) return
+    pendingScrollY = window.scrollY
+    startLoop()
+  }
+  function processScroll(now) {
+    const delta = pendingScrollY - previousScrollY
+    if (Math.abs(delta) < 3) {
+      if (scrollActive && now - lastScrollAt >= 240) {
+        scrollActive = false
+        scrollVelocity = 0
+        flight.setScrolling(false)
+      }
+      return
+    }
+    previousScrollY = pendingScrollY
     const elapsed = Math.max(1, now - (lastScrollAt || now - 16))
     lastScrollAt = now
     scrollDirection = delta > 0 ? 'down' : 'up'
     scrollVelocity = (delta / elapsed) * 1000
-    window.clearTimeout(scrollStopTimer)
+    scrollActive = true
 
     if (flight.getState() === 'GROUNDED') {
       cyclePhase = 'idle'
@@ -685,6 +782,8 @@ export function mountHeroRobot(host, container, heading) {
       movement.faceYaw(0)
       travelTarget = { x: robot.root.position.x, y: robot.root.position.y }
       flightOrigin = robot.root.position.clone()
+      flightVelocity.x = flightVelocity.y = 0
+      tap = null
       flight.startTakeoff()
     }
     flight.setScrolling(true)
@@ -697,22 +796,17 @@ export function mountHeroRobot(host, container, heading) {
           (window.scrollX + px - worldOrigin.anchorDocX) /
           worldOrigin.pxPerWorldUnit,
         y:
-          (worldOrigin.anchorDocY - (window.scrollY + py)) /
+          (worldOrigin.anchorDocY - (pendingScrollY + py)) /
           worldOrigin.pxPerWorldUnit,
       }
     }
-    startLoop()
-    scrollStopTimer = window.setTimeout(() => {
-      flight.setScrolling(false)
-      startLoop()
-    }, 180)
   }
   const handleVisibility = () => {
-    if (document.hidden) stopLoop()
+    if (document.hidden) loop.stop()
     else startLoop()
   }
   const handleMotionChange = () => {
-    stopLoop()
+    loop.stop()
     startLoop()
   }
 
@@ -730,31 +824,18 @@ export function mountHeroRobot(host, container, heading) {
   motionQuery?.addEventListener('change', handleMotionChange)
   void document.fonts?.ready?.then(() => {
     if (initialized && !disposed) {
-      syncPlacement()
-      stepSimulation(performance.now())
+      handleResize()
     }
   })
 
   initialized = true
-  syncPlacement()
   startLoop()
 
-  let surfacePhysics = null
-  void createSurfacePhysicsWorld().then((world) => {
-    if (disposed) {
-      world.dispose()
-      return
-    }
-    surfacePhysics = world
-    if (latestSurfaces.length > 0) {
-      surfacePhysics.sync(latestSurfaces)
-    }
-  })
   const stopObservingSurfaces = observePortfolioSurfaces({
     getViewHeightWorld: () => viewHeightWorld,
+    getWorldOrigin: () => worldOrigin,
     onSurfacesChange: (surfaces) => {
       latestSurfaces = surfaces
-      surfacePhysics?.sync(surfaces)
       const current = surfaces.find((s) => s.id === activePlatformId)
       if (!current) {
         supportLost = true
@@ -767,11 +848,6 @@ export function mountHeroRobot(host, container, heading) {
       activeSurfaceY = current.y
       minX = evaluated.minX
       maxX = evaluated.maxX
-      robot.root.position.x = Math.max(
-        minX,
-        Math.min(maxX, robot.root.position.x),
-      )
-      robot.root.position.y = activeSurfaceY
     },
   })
 
@@ -784,6 +860,8 @@ export function mountHeroRobot(host, container, heading) {
     const evaluated = evaluatePlatformBounds(target, robotHalfWidth)
     if (!evaluated.canStand) return
     flight.reset()
+    travelTarget = landingDestination = flightOrigin = null
+    flightVelocity.x = flightVelocity.y = 0
     prevFlightState = 'GROUNDED'
     activePlatformId = target.id
     supportLost = false
@@ -807,6 +885,10 @@ export function mountHeroRobot(host, container, heading) {
   const handleFlightTakeoff = () => {
     if (!import.meta.env.DEV) return
     if (flight.startTakeoff()) {
+      flightOrigin = robot.root.position.clone()
+      travelTarget = { x: flightOrigin.x, y: flightOrigin.y }
+      flightVelocity.x = flightVelocity.y = 0
+      tap = null
       movement.stop()
       movement.faceYaw(0)
       startLoop()
@@ -829,7 +911,7 @@ export function mountHeroRobot(host, container, heading) {
   return () => {
     disposed = true
     initialized = false
-    stopLoop()
+    loop.dispose()
     stopObservingSurfaces()
     if (import.meta.env.DEV) {
       window.removeEventListener('portfolio:place-robot', handlePlaceRobot)
@@ -840,7 +922,6 @@ export function mountHeroRobot(host, container, heading) {
       window.removeEventListener('portfolio:flight-land', handleFlightLand)
       window.removeEventListener('portfolio:force-nitro', handleForceNitro)
     }
-    surfacePhysics?.dispose()
     resizeObserver?.disconnect()
     window.removeEventListener('pointermove', handlePointerMove)
     window.removeEventListener('pointerdown', handlePointerDown)
@@ -853,7 +934,6 @@ export function mountHeroRobot(host, container, heading) {
     )
     window.removeEventListener('resize', handleResize)
     window.removeEventListener('scroll', handleScroll)
-    window.clearTimeout(scrollStopTimer)
     document.removeEventListener('visibilitychange', handleVisibility)
     motionQuery?.removeEventListener('change', handleMotionChange)
     magneticCursor.destroy()

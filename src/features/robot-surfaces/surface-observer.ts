@@ -3,13 +3,16 @@ import {
   domToWorldSurface,
   resolveHeroWorldOrigin,
   type WorldSurface,
+  type WorldCoordinateOrigin,
 } from './surface-registry'
 
 export function observePortfolioSurfaces({
   getViewHeightWorld,
+  getWorldOrigin,
   onSurfacesChange,
 }: {
   getViewHeightWorld: () => number
+  getWorldOrigin?: () => WorldCoordinateOrigin | null
   onSurfacesChange: (surfaces: WorldSurface[]) => void
 }): () => void {
   let scheduled = 0
@@ -23,7 +26,9 @@ export function observePortfolioSurfaces({
       onSurfacesChange([])
       return
     }
-    const origin = resolveHeroWorldOrigin(heroHost, getViewHeightWorld())
+    const origin = getWorldOrigin
+      ? getWorldOrigin()
+      : resolveHeroWorldOrigin(heroHost, getViewHeightWorld())
     if (!origin) return
 
     const domSurfaces = collectDomSurfaces(document)
@@ -45,7 +50,16 @@ export function observePortfolioSurfaces({
   const mutationObserver =
     typeof MutationObserver === 'undefined'
       ? null
-      : new MutationObserver(scheduleMeasure)
+      : new MutationObserver((records) => {
+          if (
+            records.some(
+              ({ target }) =>
+                target instanceof Element &&
+                target.closest('main, [data-hero-robot]'),
+            )
+          )
+            scheduleMeasure()
+        })
   mutationObserver?.observe(document.body, {
     childList: true,
     subtree: true,

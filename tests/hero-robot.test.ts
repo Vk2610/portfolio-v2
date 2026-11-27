@@ -17,6 +17,26 @@ import {
 } from '@/features/hero-robot/magnetic-cursor'
 
 describe('hero robot placement', () => {
+  it('keeps the flight phase across repeated scroll input and waits for physical alignment', () => {
+    const flight = createFlightController()
+    flight.startTakeoff()
+    flight.setScrolling(true)
+    flight.step(TAKEOFF_DURATION, false)
+    flight.setScrolling(false)
+    flight.step(2, false)
+    flight.setScrolling(false)
+    flight.step(0.5, false)
+    expect(flight.getInactiveTime()).toBe(2.5)
+    expect(flight.approach()).toBe(true)
+    expect(flight.step(2, false, false).state).toBe('APPROACHING')
+    expect(flight.step(0.01, false, true).state).toBe('LANDING')
+    expect(flight.step(1, false, false).state).toBe('LANDING')
+    flight.setScrolling(true)
+    flight.setScrolling(true)
+    expect(flight.step(0.01, false).state).toBe('TRAVELLING')
+    expect(flight.startTakeoff()).toBe(false)
+  })
+
   it('places the invisible platform at the intro lower edge within the left column', () => {
     const container = document.createElement('div')
     const leftColumn = document.createElement('div')

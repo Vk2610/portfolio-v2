@@ -7,6 +7,7 @@ export interface LandingPoint {
   x: number
   directlyBelow: boolean
   distance: number
+  inTravelDirection: boolean
 }
 
 export function selectLandingPoint(
@@ -15,16 +16,19 @@ export function selectLandingPoint(
   currentX: number,
   currentY: number,
   platformY: number,
+  direction: 'up' | 'down' = 'down',
 ): LandingPoint | null {
   const minX = Math.max(safeBounds.minX, visibleBounds.minX)
   const maxX = Math.min(safeBounds.maxX, visibleBounds.maxX)
-  if (maxX < minX || platformY >= currentY) return null
+  if (maxX < minX) return null
 
   if (currentX >= minX && currentX <= maxX) {
     return {
       x: currentX,
       directlyBelow: true,
-      distance: currentY - platformY,
+      distance: Math.abs(currentY - platformY),
+      inTravelDirection:
+        direction === 'up' ? platformY >= currentY : platformY <= currentY,
     }
   }
 
@@ -33,5 +37,7 @@ export function selectLandingPoint(
     x,
     directlyBelow: false,
     distance: Math.hypot(currentX - x, currentY - platformY),
+    inTravelDirection:
+      direction === 'up' ? platformY >= currentY : platformY <= currentY,
   }
 }

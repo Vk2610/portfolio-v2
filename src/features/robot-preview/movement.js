@@ -665,6 +665,9 @@ export function createMovement(robot, physics, emotions, physicsOptions) {
     configurePhysics,
     reset,
     proportionsChanged: () => physics.rebuild(),
+    syncSupportHeight: (height) => {
+      if (!isLocked() && !jump) floor = height
+    },
     stagePlatform: (height, x = 0) => {
       if (isLocked() || jump) return false
       speed = route = walkMix = 0

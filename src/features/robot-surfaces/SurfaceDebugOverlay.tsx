@@ -27,6 +27,11 @@ interface RobotTelemetry {
   scrollInactiveMs?: number
   viewportPosition?: { x: number; y: number }
   targetPosition?: { x: number; y: number } | null
+  activeSimulationLoops?: number
+  transitionCount?: number
+  positionOwner?: string
+  frameTimeMs?: number
+  largestFrameDisplacement?: number
 }
 
 const DEFAULT_ROBOT_HALF_WIDTH = 0.55
@@ -214,6 +219,14 @@ export function SurfaceDebugOverlay() {
               <div className="text-[10px] text-muted">
                 <div>
                   Active: {telemetry.platformId} ({telemetry.state})
+                </div>
+                <div>
+                  Loops {telemetry.activeSimulationLoops} · transitions{' '}
+                  {telemetry.transitionCount} · owner {telemetry.positionOwner}
+                </div>
+                <div>
+                  Frame {telemetry.frameTimeMs?.toFixed(1)}ms · max step{' '}
+                  {telemetry.largestFrameDisplacement?.toFixed(3)}u
                 </div>
                 <div>
                   Boosters: {telemetry.booster?.visible ? 'visible' : 'hidden'}{' '}
