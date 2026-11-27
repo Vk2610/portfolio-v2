@@ -93,5 +93,4 @@ export const projects: readonly Project[] = [
   },
 ]
 
-export const { featured: featuredProjects, archive: archivedProjects } =
-  selectProjects(projects)
+export const { featured: featuredProjects } = selectProjects(projects)

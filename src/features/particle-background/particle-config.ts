@@ -23,8 +23,6 @@ export const particleConfig = {
   maximumFrameSeconds: 0.1,
 }
 
-export type ParticleConfig = typeof particleConfig
-
 export function particleCount(width: number, config = particleConfig) {
   // The configured counts already represent the reference density.
   const densityFactor = config.density / referenceDensity
