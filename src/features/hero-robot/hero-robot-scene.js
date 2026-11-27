@@ -32,6 +32,7 @@ import { advanceFlightPosition } from './flight-motion'
 import { resolveHeroWorldOrigin } from '@/features/robot-surfaces/surface-registry'
 import { evaluatePlatformBounds } from '@/features/robot-surfaces/platform-movement'
 import { selectLandingPoint } from './landing-position'
+import { sampleHeroLandingTrajectory } from './hero-landing-trajectory'
 
 function createStudioEnvironment(renderer) {
   const studio = new Scene()
@@ -157,6 +158,7 @@ export function mountHeroRobot(host, container, heading) {
   let travelTarget = null
   let flightOrigin = null
   let landingDestination = null
+  let heroApproach = null
   let lastTelemetryAt = 0
   let forceNitro = false
 
@@ -278,6 +280,7 @@ export function mountHeroRobot(host, container, heading) {
           y: robot.root.position.y - TARGET_HOVER_HEIGHT,
         }
         landingDestination = null
+        heroApproach = null
       }
     }
     const startX = robot.root.position.x
@@ -366,22 +369,62 @@ export function mountHeroRobot(host, container, heading) {
           canWalk: selected.bounds.canWalk,
         }
         travelTarget = { x: landingDestination.x, y: landingDestination.y }
+        heroApproach =
+          selected.surface.kind === 'hero-platform'
+            ? {
+                elapsed: 0,
+                duration: Math.max(
+                  0.9,
+                  Math.min(
+                    1.8,
+                    Math.hypot(
+                      robot.root.position.x - landingDestination.x,
+                      robot.root.position.y -
+                        (landingDestination.y + TARGET_HOVER_HEIGHT),
+                    ) / 2.5,
+                  ),
+                ),
+                from: { x: robot.root.position.x, y: robot.root.position.y },
+                to: {
+                  x: landingDestination.x,
+                  y: landingDestination.y + TARGET_HOVER_HEIGHT,
+                },
+                velocity: { x: flightVelocity.x, y: flightVelocity.y },
+                dip: Math.min(0.42, Math.max(0.08, Math.abs(landingDestination.x - robot.root.position.x) * 0.12)),
+                clearance: Math.min(0.24, Math.max(0.08, Math.abs(landingDestination.x - robot.root.position.x) * 0.045)),
+              }
+            : null
       }
     }
     if (flightFrame.isFlying && travelTarget && worldOrigin) {
-      const targetX =
-        landingDestination &&
-        startY < landingDestination.y + 0.15 &&
-        flightFrame.state === 'APPROACHING'
-          ? startX
-          : travelTarget.x
-      advanceFlightPosition(
-        robot.root.position,
-        flightVelocity,
-        targetX,
-        travelTarget.y + flightFrame.hoverOffset,
-        dt,
-      )
+      if (heroApproach && flightFrame.state === 'APPROACHING') {
+        heroApproach.elapsed = Math.min(
+          heroApproach.duration,
+          heroApproach.elapsed + dt,
+        )
+        const previousX = robot.root.position.x
+        const previousY = robot.root.position.y
+        const point = sampleHeroLandingTrajectory(heroApproach, heroApproach.elapsed / heroApproach.duration)
+        robot.root.position.x = point.x
+        robot.root.position.y = point.y
+        flightVelocity.x = dt > 0 ? (robot.root.position.x - previousX) / dt : 0
+        flightVelocity.y = dt > 0 ? (robot.root.position.y - previousY) / dt : 0
+      } else {
+        const targetX =
+          landingDestination &&
+          landingDestination.platformId !== 'hero-platform-1' &&
+          startY < landingDestination.y + 0.15 &&
+          flightFrame.state === 'APPROACHING'
+            ? startX
+            : travelTarget.x
+        advanceFlightPosition(
+          robot.root.position,
+          flightVelocity,
+          targetX,
+          travelTarget.y + flightFrame.hoverOffset,
+          dt,
+        )
+      }
       robot.root.quaternion.identity()
     }
     const justLanded =
@@ -789,6 +832,7 @@ export function mountHeroRobot(host, container, heading) {
     }
     flight.setScrolling(true)
     landingDestination = null
+    heroApproach = null
     if (worldOrigin) {
       const px = window.innerWidth * 0.72
       const py = window.innerHeight * 0.68

@@ -1,4 +1,3 @@
-import { lazy, Suspense } from 'react'
 import { Navbar } from '@/components/layout/Navbar'
 import { CustomCursor } from '@/features/custom-cursor/CustomCursor'
 import { ParticleBackground } from '@/features/particle-background/ParticleBackground'
@@ -10,14 +9,6 @@ import { TechnologyStack } from '@/sections/TechnologyStack'
 import { Experience } from '@/sections/Experience'
 import { SelectedProjects } from '@/sections/SelectedProjects'
 import { Contact } from '@/sections/Contact'
-
-const SurfaceDebugOverlay = import.meta.env.DEV
-  ? lazy(() =>
-      import('@/features/robot-surfaces/SurfaceDebugOverlay').then((m) => ({
-        default: m.SurfaceDebugOverlay,
-      })),
-    )
-  : null
 
 export default function App() {
   return (
@@ -38,11 +29,6 @@ export default function App() {
         <SelectedProjects />
         <Contact />
       </main>
-      {SurfaceDebugOverlay && (
-        <Suspense fallback={null}>
-          <SurfaceDebugOverlay />
-        </Suspense>
-      )}
     </div>
   )
 }
