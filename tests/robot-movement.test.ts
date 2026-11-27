@@ -35,6 +35,21 @@ function setup(scales?: { head: number; body: number; overall: number }) {
 }
 
 describe('H1 movement', () => {
+  it('completes a requested face turn before reaching idle', () => {
+    const { robot, movement, tick, physics } = setup()
+    try {
+      movement.rotateBy(Math.PI / 2)
+      movement.faceYaw(0)
+      expect(tick().state).toBe('turning')
+      let state = 'turning'
+      for (let i = 0; i < 120 && state === 'turning'; i++) state = tick().state
+      expect(state).toBe('idle')
+      expect(robot.root.quaternion.angleTo(new Quaternion())).toBeLessThan(0.02)
+    } finally {
+      physics.dispose()
+    }
+  })
+
   it('turns and travels in both directions while a stance ankle holds its ground position', () => {
     const { robot, movement, tick, physics } = setup()
     try {

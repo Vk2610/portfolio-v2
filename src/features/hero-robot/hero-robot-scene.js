@@ -432,7 +432,7 @@ export function mountHeroRobot(host, container, heading) {
           movement.stop()
           movement.faceYaw(0)
         } else if (cyclePhase === 'idle') {
-          movement.stop()
+          if (statusBefore.state !== 'turning') movement.stop()
           if (statusBefore.state === 'idle') {
             phaseRemaining -= dt
           }
